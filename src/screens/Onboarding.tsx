@@ -4,7 +4,7 @@ import {ArrowRight,Check,Lock} from 'lucide-react';
 import {BrandIntro,Logo} from '../components/brand';
 import {Ring,Ticker,WorkList,ease} from '../components/ui';
 import {firstLine,parse} from '../content/context';
-import {getWorkspace,setWorkspace} from '../workspace';
+import {setCompany} from '../workspace';
 import {BriefView} from '../components/brief';
 
 export type ObStart='welcome'|'website'|'research';
@@ -68,7 +68,7 @@ function Learning({domain,onDone,onBack}:{domain:string;onDone:()=>void;onBack:(
    if(e.t==='wait')setLine(`Waiting ${e.seconds}s for the writing model`);
    if(e.t==='md')setParts(p=>({...p,[e.part]:e.text}));
    if(e.t==='done'){finished=true;es?.close();setMeta({name:e.name,logo:e.logo});setPhase('done');setLine('Your brief is ready');
-    const prev=getWorkspace();setWorkspace({domain:e.domain,name:e.name,logo:e.logo,md:e.md,saved:e.saved,groups:e.groups,articles:prev.domain===e.domain?prev.articles:[]});setTimeout(onDone,1200);}
+    setCompany({domain:e.domain,name:e.name,logo:e.logo,md:e.md,saved:e.saved,groups:e.groups});setTimeout(onDone,1200);}
    if(e.t==='error'){finished=true;es?.close();setErr(e.message);setPhase('error');}
   };
   return()=>{clearTimeout(t);es?.close();};

@@ -2,12 +2,16 @@ import {defineConfig,loadEnv,type Plugin} from 'vite';
 import {readBrief,research} from './server/research';
 import {makeWriter,type Writer} from './server/llm';
 import {publishRoutes} from './server/api';
+import {database,type GetStore} from './server/db';
+import {dbRoutes} from './server/db/routes';
 
 // /api/research?domain=… streams progress as server-sent events while the website is read and the brief is written.
 // API keys stay on this local server; the browser never sees them.
-function researchApi(writer:Writer|null):Plugin{
+function researchApi(writer:Writer|null,getStore:GetStore):Plugin{
  return {name:'research-api',configureServer(server){
-  publishRoutes(server.middlewares.use.bind(server.middlewares));
+  const use=server.middlewares.use.bind(server.middlewares);
+  publishRoutes(use,getStore);
+  dbRoutes(use,getStore);
   // Internal: both versions of the brief (context.md for the user, context-full.md for writing).
   server.middlewares.use('/api/brief',async(req,res)=>{
    const host=new URL(req.url||'',`http://${req.headers.host}`).searchParams.get('domain')||'';
@@ -28,5 +32,5 @@ function researchApi(writer:Writer|null):Plugin{
 // React is compiled by Vite's built-in esbuild JSX transform; no plugin needed for the design prototype.
 export default defineConfig(({mode})=>{
  const env=loadEnv(mode,process.cwd(),'');
- return {esbuild:{jsx:'automatic'},plugins:[researchApi(makeWriter(env))],server:{fs:{allow:['..','/Users/amarroy/.cache/comarketer-runtime']},watch:{ignored:['**/research-store/**','**/.secrets/**']}}};
+ return {esbuild:{jsx:'automatic'},plugins:[researchApi(makeWriter(env),database(env.DATABASE_URL||''))],server:{fs:{allow:['..','/Users/amarroy/.cache/comarketer-runtime']},watch:{ignored:['**/research-store/**','**/.secrets/**','**/.data/**']}}};
 });

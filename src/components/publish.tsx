@@ -1,10 +1,11 @@
 import {useEffect,useState} from 'react';
 import {AnimatePresence,motion} from 'motion/react';
-import {Check,ClipboardCopy,Code2,Download,ExternalLink,FileText,Globe,LoaderCircle,Send,TriangleAlert,X} from 'lucide-react';
+import {CalendarClock,ClipboardCopy,Code2,Download,ExternalLink,FileText,Globe,LoaderCircle,Send,TriangleAlert,X} from 'lucide-react';
 import {ease} from './ui';
 import {Tick} from './steps';
 import {copyFormatted,copyHTML,copyMarkdown,downloadZip} from '../article-data';
-import {useWorkspace} from '../workspace';
+import {loadArticle,useWorkspace,whenExact} from '../workspace';
+import type {Article} from '../data';
 import type {Post} from '../post';
 
 export const platformNames:Record<string,string>={wordpress:'WordPress',webflow:'Webflow',hubspot:'HubSpot',ghost:'Ghost'};
@@ -15,21 +16,26 @@ export function useConnections(){
  useEffect(()=>{load();},[ws.domain]);
  return {list,reload:load};
 }
-type Done={id:string;url:string;editUrl:string;status:string;warnings:string[]};
+type Done={id:string;url:string;editUrl:string;status:'draft'|'published'|'scheduled';warnings:string[]};
+type Mode='draft'|'publish'|'schedule';
+// The earliest time to offer: the next quarter hour, at least ten minutes away, in the browser's time zone.
+const soonest=()=>{const d=new Date(Date.now()+10*60000);d.setMinutes(Math.ceil(d.getMinutes()/15)*15,0,0);return new Date(+d-d.getTimezoneOffset()*60000).toISOString().slice(0,16);};
 
 // Publish to a connected blog, or copy and download in the exact format.
-export function PublishPanel({post,images,ready,onToast,onSettings,onPublished}:{post:Post;images:string[];ready:boolean;onToast:(t:string)=>void;onSettings?:()=>void;onPublished?:(r:Done&{platform:string})=>void}){
- const ws=useWorkspace(),{list}=useConnections(),[run,setRun]=useState<{platform:string;mode:string;steps:string[];done?:Done;error?:string}|null>(null);
- const go=async(platform:string,mode:'draft'|'publish')=>{
-  setRun({platform,mode,steps:['Preparing the article']});
+// With an article, the server saves where it went (status, links, date), so the library shows it.
+export function PublishPanel({article,post,images,ready,onToast,onSettings}:{article?:Article;post:Post;images:string[];ready:boolean;onToast:(t:string)=>void;onSettings?:()=>void}){
+ const ws=useWorkspace(),{list}=useConnections(),[run,setRun]=useState<{platform:string;mode:Mode;steps:string[];done?:Done;error?:string}|null>(null);
+ const [plan,setPlan]=useState<string|null>(null),[at,setAt]=useState(soonest);
+ const go=async(platform:string,mode:Mode)=>{
+  setPlan(null);setRun({platform,mode,steps:['Preparing the article']});
   const add=(f:(r:NonNullable<typeof run>)=>NonNullable<typeof run>)=>setRun(r=>r&&f(r));
   try{
-   const res=await fetch('/api/publish',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({domain:ws.domain,platform,mode,post,images:post.images.map((im,i)=>({name:im.name,alt:im.alt,mime:images[i].slice(5,images[i].indexOf(';')),base64:images[i].split(',')[1]}))})});
+   const res=await fetch('/api/publish',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({domain:ws.domain,articleId:article?.id,platform,mode,at:mode==='schedule'?new Date(at).toISOString():undefined,post,images:post.images.map((im,i)=>({name:im.name,alt:im.alt,mime:images[i].slice(5,images[i].indexOf(';')),base64:images[i].split(',')[1]}))})});
    const reader=res.body!.getReader(),dec=new TextDecoder();let buf='';
    for(;;){const {value,done}=await reader.read();if(done)break;buf+=dec.decode(value,{stream:true});const lines=buf.split('\n');buf=lines.pop()||'';
     for(const l of lines){if(!l.trim())continue;const e=JSON.parse(l);
      if(e.t==='step')add(r=>({...r,steps:[...r.steps,e.label]}));
-     if(e.t==='done'){add(r=>({...r,done:e}));onPublished?.({...e,platform});}
+     if(e.t==='done'){add(r=>({...r,done:e}));if(article)loadArticle(article.id);}
      if(e.t==='error')add(r=>({...r,error:e.message}));}}
   }catch{add(r=>({...r,error:'The connection to the server dropped. Try again.'}));}
  };
@@ -37,10 +43,16 @@ export function PublishPanel({post,images,ready,onToast,onSettings,onPublished}:
   onToast(what==='formatted'?'Copied with formatting and images. Paste into Google Docs, WordPress or Notion.':what==='html'?'HTML copied. Images are in the download.':'Markdown copied.');}catch{onToast('Your browser blocked the clipboard. Use Download instead.');}};
  return <div className="publish-panel">
   <section><span className="eyebrow">Publish to your blog</span>
+   {article?.cms&&<p className="pub-warn"><TriangleAlert size={15}/><span>{article.status==='Published'?'Already live':article.status==='Scheduled'?`Scheduled for ${whenExact(article.scheduledFor)}`:'A draft is already'} on {platformNames[article.cms]}. Sending again adds a second post there. {article.editUrl&&<a href={article.editUrl} target="_blank" rel="noreferrer">Open it in {platformNames[article.cms]}</a>}</span></p>}
    {list===null?<p className="muted">Checking connections…</p>:list.length?list.map(c=><div key={c.platform} className="pub-target">
      <div><strong>{platformNames[c.platform]}</strong><small>{c.label}</small></div>
      <button className="button primary compact" disabled={!ready} onClick={()=>go(c.platform,'draft')}><Send size={14}/>Send as draft</button>
      <button className="button ghost compact" disabled={!ready} onClick={()=>go(c.platform,'publish')}>Publish now</button>
+     {c.platform!=='webflow'&&<button className="button ghost compact" disabled={!ready} aria-expanded={plan===c.platform} onClick={()=>setPlan(p=>p===c.platform?null:c.platform)}><CalendarClock size={14}/>Schedule</button>}
+     <AnimatePresence>{plan===c.platform&&<motion.form className="pub-schedule" initial={{opacity:0,height:0}} animate={{opacity:1,height:'auto'}} exit={{opacity:0,height:0}} transition={{duration:.2,ease}} onSubmit={e=>{e.preventDefault();go(c.platform,'schedule');}}>
+      <label className="field compact">Goes live on<input type="datetime-local" required min={soonest()} value={at} onChange={e=>setAt(e.target.value)}/></label>
+      <button className="button primary compact" disabled={!at||new Date(at).getTime()<Date.now()+60000}>Schedule on {platformNames[c.platform]}</button>
+     </motion.form>}</AnimatePresence>
     </div>)
    :<div className="pub-empty"><Globe size={18}/><div><strong>No blog connected yet</strong><small>WordPress, Webflow, HubSpot or Ghost. Images and SEO fields go across too.</small></div>{onSettings&&<button className="button secondary compact" onClick={onSettings}>Connect</button>}</div>}
   </section>
@@ -53,7 +65,7 @@ export function PublishPanel({post,images,ready,onToast,onSettings,onPublished}:
    </div>
   </section>
   <AnimatePresence>{run&&<motion.div className="pub-run" initial={{opacity:0,y:8}} animate={{opacity:1,y:0}} exit={{opacity:0}} transition={{duration:.25,ease}}>
-   <header><strong>{run.done?(run.done.status==='published'?`Published on ${platformNames[run.platform]}`:`Draft is in ${platformNames[run.platform]}`):run.error?'Could not publish':`Sending to ${platformNames[run.platform]}`}</strong>{(run.done||run.error)&&<button className="icon-button" aria-label="Close" onClick={()=>setRun(null)}><X size={16}/></button>}</header>
+   <header><strong>{run.done?(run.done.status==='published'?`Published on ${platformNames[run.platform]}`:run.done.status==='scheduled'?`Scheduled on ${platformNames[run.platform]} for ${whenExact(new Date(at).toISOString())}`:`Draft is in ${platformNames[run.platform]}`):run.error?'Could not publish':`Sending to ${platformNames[run.platform]}`}</strong>{(run.done||run.error)&&<button className="icon-button" aria-label="Close" onClick={()=>setRun(null)}><X size={16}/></button>}</header>
    <ul>{run.steps.map((s,i)=>{const last=i===run.steps.length-1&&!run.done&&!run.error;return <li key={s+i} className={last?'now':'done'}><span>{last?<LoaderCircle className="spin" size={13}/>:<Tick size={12}/>}</span>{s}</li>;})}</ul>
    {run.error&&<p className="pub-error"><TriangleAlert size={15}/>{run.error}</p>}
    {run.done&&<>{run.done.warnings.map(w=><p key={w} className="pub-warn"><TriangleAlert size={15}/>{w}</p>)}

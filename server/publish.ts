@@ -7,7 +7,8 @@ import type {Connection,Platform} from './connections';
 
 export type InImage={name:string;alt:string;mime:string;base64:string};
 export type Progress={step:(label:string)=>void;warn:(text:string)=>void};
-export type Result={id:string;url:string;editUrl:string;status:'draft'|'published';warnings:string[]};
+export type Mode='draft'|'publish'|'schedule';
+export type Result={id:string;url:string;editUrl:string;status:'draft'|'published'|'scheduled';warnings:string[]};
 type Creds=Record<string,string>;
 
 const site=(u:string)=>{const s=u.trim().replace(/\/+$/,'');return /^https?:\/\//.test(s)?s:`https://${s}`;};
@@ -20,6 +21,8 @@ async function call(label:string,url:string,init:RequestInit={}):Promise<any>{
 }
 const bytes=(img:InImage)=>Buffer.from(img.base64,'base64');
 const blobOf=(img:InImage)=>new Blob([new Uint8Array(bytes(img))],{type:img.mime});
+const stepLabel=(m:Mode)=>m==='publish'?'Publishing the post':m==='schedule'?'Scheduling the post':'Creating the draft';
+const outcome=(m:Mode)=>m==='publish'?'published' as const:m==='schedule'?'scheduled' as const:'draft' as const;
 const fileName=(post:Post,i:number,img:InImage)=>`${post.slug}-${String(i+1).padStart(2,'0')}-${post.images[i].name}.${img.mime==='image/jpeg'?'jpg':'png'}`;
 
 // ---------------- WordPress (REST API + Application Password) ----------------
@@ -31,7 +34,7 @@ const wordpress={
   const ns:string[]=root.namespaces||[],seo=ns.includes('yoast/v1')?'yoast':ns.includes('rankmath/v1')?'rankmath':'none';
   return {label:root.name||new URL(base).host,settings:{site:base,seo}};
  },
- async publish(conn:Connection,post:Post,images:InImage[],mode:'draft'|'publish',p:Progress):Promise<Result>{
+ async publish(conn:Connection,post:Post,images:InImage[],mode:Mode,p:Progress,at?:string):Promise<Result>{
   const c=conn.creds,base=site(c.site),h=wpAuth(c),warnings:string[]=[];
   const media:{id:number;url:string}[]=[];
   for(let i=0;i<images.length;i++){p.step(`Uploading image ${i+1} of ${images.length}`);
@@ -43,15 +46,15 @@ const wordpress={
   let content=toWordPress(post,i=>({src:media[i].url,alt:post.images[i].alt,id:media[i].id}));
   // SEO plugins already add Article schema; only add ours when there is none.
   if(seo==='none')content+=`\n\n<!-- wp:html -->\n${jsonLdScript(toJsonLd(post,'',media[post.featured]?.url||''))}\n<!-- /wp:html -->`;
-  p.step(mode==='publish'?'Publishing the post':'Creating the draft');
+  p.step(stepLabel(mode));
   const made=await call('WordPress post',`${base}/wp-json/wp/v2/posts`,{method:'POST',headers:{...h,'content-type':'application/json'},
-   body:JSON.stringify({title:post.title,slug:post.slug,content,excerpt:post.excerpt,status:mode==='publish'?'publish':'draft',featured_media:media[post.featured]?.id,meta})});
+   body:JSON.stringify({title:post.title,slug:post.slug,content,excerpt:post.excerpt,status:mode==='publish'?'publish':mode==='schedule'?'future':'draft',...(at?{date_gmt:at.slice(0,19)}:{}),featured_media:media[post.featured]?.id,meta})});
   p.step('Checking it saved');
   const back=await call('WordPress check',`${base}/wp-json/wp/v2/posts/${made.id}?context=edit`,{headers:h});
   if(back.title?.raw!==post.title)warnings.push('The title came back different. Check it in WordPress.');
   if(seo==='none')warnings.push('No SEO plugin found. Set the SEO title and meta description in WordPress, or install Yoast or Rank Math.');
   else if(Object.keys(meta).some(k=>back.meta?.[k]!==meta[k]))warnings.push(`${seo==='yoast'?'Yoast':'Rank Math'} did not accept the SEO title and description through the API. Install the small plugin in integrations/wordpress once, then publish again.`);
-  return {id:String(made.id),url:back.link||made.link,editUrl:`${base}/wp-admin/post.php?post=${made.id}&action=edit`,status:mode==='publish'?'published':'draft',warnings};
+  return {id:String(made.id),url:back.link||made.link,editUrl:`${base}/wp-admin/post.php?post=${made.id}&action=edit`,status:outcome(mode),warnings};
  },
 };
 
@@ -75,8 +78,9 @@ const webflow={
   const up=await fetch(a.uploadUrl,{method:'POST',body:form});if(!up.ok)throw new Error(`Webflow asset upload (${up.status}).`);
   return a.hostedUrl||a.assetUrl;
  },
- async publish(conn:Connection,post:Post,images:InImage[],mode:'draft'|'publish',p:Progress):Promise<Result>{
+ async publish(conn:Connection,post:Post,images:InImage[],mode:Mode,p:Progress,at?:string):Promise<Result>{
   const c=conn.creds,s=conn.settings,m=s.map||{},warnings:string[]=[];
+  if(mode==='schedule')throw new Error('Webflow cannot schedule posts through its API. Send it as a draft, then schedule it in Webflow.');
   if(!s.collectionId||!m.body)throw new Error('Webflow: pick the blog collection and match its fields in Settings first.');
   const urls:string[]=[];
   for(let i=0;i<images.length;i++){p.step(`Uploading image ${i+1} of ${images.length}`);urls.push(await webflow.upload(c,s.siteId,fileName(post,i,images[i]),images[i]));}
@@ -88,7 +92,7 @@ const webflow={
   const live=`https://${s.domain}/${s.collectionSlug}/${post.slug}`;
   if(m.schema)fieldData[m.schema]=jsonLdScript(toJsonLd(post,live,urls[post.featured]));else warnings.push('No schema field matched. Add a plain text field for schema in the collection and match it in Settings.');
   if(!m.metaDescription)warnings.push('No meta description field matched, so Webflow will use its default.');
-  p.step(mode==='publish'?'Publishing the post':'Creating the draft');
+  p.step(stepLabel(mode));
   const made=await call('Webflow item',`${WF}/collections/${s.collectionId}/items${mode==='publish'?'/live':''}`,{method:'POST',headers:{...wf(c),'content-type':'application/json'},body:JSON.stringify({isDraft:mode!=='publish',isArchived:false,fieldData})});
   const id=made.id||made.items?.[0]?.id;
   p.step('Checking it saved');
@@ -104,7 +108,7 @@ const HS='https://api.hubapi.com';
 const hubspot={
  async test(c:Creds){const b=await call('HubSpot',`${HS}/cms/v3/blog-settings/settings`,{headers:hs(c)});const blogs=b.results||[];if(!blogs.length)throw new Error('HubSpot: no blog found in this account.');
   return {label:blogs[0].name||'HubSpot blog',settings:{blogId:blogs[0].id,blogs:blogs.map((x:any)=>({id:x.id,name:x.name,url:x.absoluteUrl}))}};},
- async publish(conn:Connection,post:Post,images:InImage[],mode:'draft'|'publish',p:Progress):Promise<Result>{
+ async publish(conn:Connection,post:Post,images:InImage[],mode:Mode,p:Progress,at?:string):Promise<Result>{
   const c=conn.creds,warnings:string[]=[],urls:string[]=[];
   for(let i=0;i<images.length;i++){p.step(`Uploading image ${i+1} of ${images.length}`);
    const form=new FormData();form.append('file',blobOf(images[i]),fileName(post,i,images[i]));form.append('fileName',fileName(post,i,images[i]));form.append('folderPath','/comarketer');form.append('options',JSON.stringify({access:'PUBLIC_INDEXABLE',overwrite:false}));
@@ -112,12 +116,13 @@ const hubspot={
   p.step('Creating the draft');
   const made=await call('HubSpot post',`${HS}/cms/v3/blogs/posts`,{method:'POST',headers:{...hs(c),'content-type':'application/json'},body:JSON.stringify({
    name:post.title,contentGroupId:conn.settings.blogId,slug:post.slug,htmlTitle:post.metaTitle,metaDescription:post.metaDescription,postSummary:post.excerpt,
-   postBody:toHTML(post,i=>({src:urls[i],alt:post.images[i].alt}),{title:false}),featuredImage:urls[post.featured],featuredImageAltText:post.images[post.featured].alt,useFeaturedImage:true,publishDate:new Date().toISOString()})});
+   postBody:toHTML(post,i=>({src:urls[i],alt:post.images[i].alt}),{title:false}),featuredImage:urls[post.featured],featuredImageAltText:post.images[post.featured].alt,useFeaturedImage:true,publishDate:at||new Date().toISOString()})});
   if(mode==='publish'){p.step('Publishing the post');await call('HubSpot publish',`${HS}/cms/v3/blogs/posts/${made.id}`,{method:'PATCH',headers:{...hs(c),'content-type':'application/json'},body:JSON.stringify({state:'PUBLISHED'})});}
+  if(mode==='schedule'){p.step('Scheduling the post');await call('HubSpot schedule',`${HS}/cms/v3/blogs/posts/schedule`,{method:'POST',headers:{...hs(c),'content-type':'application/json'},body:JSON.stringify({id:String(made.id),publishDate:at})});}
   p.step('Checking it saved');
   const back=await call('HubSpot check',`${HS}/cms/v3/blogs/posts/${made.id}`,{headers:hs(c)});
   if(back.metaDescription!==post.metaDescription)warnings.push('The meta description came back different. Check it in HubSpot.');
-  return {id:String(made.id),url:back.url||'',editUrl:back.url||'https://app.hubspot.com',status:mode==='publish'?'published':'draft',warnings};
+  return {id:String(made.id),url:back.url||'',editUrl:back.url||'https://app.hubspot.com',status:outcome(mode),warnings};
  },
 };
 
@@ -131,23 +136,23 @@ function ghostToken(adminKey:string){
 const gh=(c:Creds)=>({authorization:`Ghost ${ghostToken(c.adminKey)}`,'accept-version':'v5.0'});
 const ghost={
  async test(c:Creds){const s=await call('Ghost',`${site(c.site)}/ghost/api/admin/site/`,{headers:gh(c)});return {label:s.site?.title||new URL(site(c.site)).host,settings:{site:site(c.site)}};},
- async publish(conn:Connection,post:Post,images:InImage[],mode:'draft'|'publish',p:Progress):Promise<Result>{
+ async publish(conn:Connection,post:Post,images:InImage[],mode:Mode,p:Progress,at?:string):Promise<Result>{
   const c=conn.creds,base=site(c.site),warnings:string[]=[],urls:string[]=[];
   for(let i=0;i<images.length;i++){p.step(`Uploading image ${i+1} of ${images.length}`);
    const form=new FormData();form.append('file',blobOf(images[i]),fileName(post,i,images[i]));form.append('purpose','image');form.append('ref',fileName(post,i,images[i]));
    urls.push((await call('Ghost image',`${base}/ghost/api/admin/images/upload/`,{method:'POST',headers:gh(c),body:form})).images[0].url);}
-  p.step(mode==='publish'?'Publishing the post':'Creating the draft');
+  p.step(stepLabel(mode));
   // Ghost has no tables in its editor, so each table goes in an HTML card and stays exact. Ghost adds Article schema itself.
   const made=(await call('Ghost post',`${base}/ghost/api/admin/posts/?source=html`,{method:'POST',headers:{...gh(c),'content-type':'application/json'},body:JSON.stringify({posts:[{
-   title:post.title,slug:post.slug,html:toHTML(post,i=>({src:urls[i],alt:post.images[i].alt}),{title:false,tables:'ghost-card'}),status:mode==='publish'?'published':'draft',
+   title:post.title,slug:post.slug,html:toHTML(post,i=>({src:urls[i],alt:post.images[i].alt}),{title:false,tables:'ghost-card'}),status:mode==='publish'?'published':mode==='schedule'?'scheduled':'draft',...(at?{published_at:at}:{}),
    custom_excerpt:post.excerpt.slice(0,300),meta_title:post.metaTitle,meta_description:post.metaDescription,feature_image:urls[post.featured],feature_image_alt:post.images[post.featured].alt}]})})).posts[0];
   p.step('Checking it saved');
   const back=(await call('Ghost check',`${base}/ghost/api/admin/posts/${made.id}/?formats=html`,{headers:gh(c)})).posts[0];
   if(!back.html||back.html.length<200)warnings.push('Ghost saved the post with an empty body. Open it in Ghost to check.');
   if(back.meta_description!==post.metaDescription)warnings.push('The meta description did not save. Set it in Ghost under Post settings.');
-  return {id:made.id,url:back.url,editUrl:`${base}/ghost/#/editor/post/${made.id}`,status:mode==='publish'?'published':'draft',warnings};
+  return {id:made.id,url:back.url,editUrl:`${base}/ghost/#/editor/post/${made.id}`,status:outcome(mode),warnings};
  },
 };
 
-export const publishers:Record<Platform,{test:(c:Creds)=>Promise<{label:string;settings:Record<string,any>}>;publish:(conn:Connection,post:Post,images:InImage[],mode:'draft'|'publish',p:Progress)=>Promise<Result>}>={wordpress,webflow,hubspot,ghost};
+export const publishers:Record<Platform,{test:(c:Creds)=>Promise<{label:string;settings:Record<string,any>}>;publish:(conn:Connection,post:Post,images:InImage[],mode:Mode,p:Progress,at?:string)=>Promise<Result>}>={wordpress,webflow,hubspot,ghost};
 export const webflowOptions=webflow.options;

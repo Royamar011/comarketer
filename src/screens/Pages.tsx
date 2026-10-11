@@ -6,7 +6,7 @@ import {Tile,ease} from '../components/ui';
 import {StepTrack} from '../components/steps';
 import {BriefView} from '../components/brief';
 import {Connections} from '../components/connections';
-import {useWorkspace} from '../workspace';
+import {useWorkspace,when,whenExact} from '../workspace';
 import {voicesFor,workflowSteps,type Article,type Voice} from '../data';
 const greeting=()=>{const h=new Date().getHours();return h<12?'Good morning':h<18?'Good afternoon':'Good evening';};
 
@@ -15,9 +15,9 @@ const order:Record<string,number>={you:0,Ready:1,us:2,Scheduled:3,Published:4};
 const rank=(a:Article)=>a.status==='In progress'?order[a.waiting||'you']:order[a.status];
 
 // Home has two jobs: start a new blog, and pick up the ones already going.
-export function Home({onNew,onOpen,onLibrary}:{onNew:(keyword:string)=>void;onOpen:(id:string)=>void;onLibrary:()=>void;firstVisit:boolean}){
- const [kw,setKw]=useState(''),[focus,setFocus]=useState(false),ws=useWorkspace(),articles=ws.articles;
- const blogs=[...articles].sort((a,b)=>rank(a)-rank(b)).slice(0,6),yours=articles.filter(a=>a.waiting==='you').length;
+export function Home({onNew,onOpen,onResume,onLibrary}:{onNew:(keyword:string)=>void;onOpen:(id:string)=>void;onResume:(id:string)=>void;onLibrary:()=>void;firstVisit:boolean}){
+ const [kw,setKw]=useState(''),[focus,setFocus]=useState(false),ws=useWorkspace(),articles=ws.articles.filter(a=>!a.archivedAt);
+ const blogs=[...articles].sort((a,b)=>rank(a)-rank(b)||b.updated.localeCompare(a.updated)).slice(0,6),yours=articles.filter(a=>a.waiting==='you').length;
  return <div className="home2">
   <motion.section className="ask" initial={{opacity:0,y:14}} animate={{opacity:1,y:0}} transition={{duration:.5,ease}}>
    <h1>{greeting()}</h1>
@@ -33,15 +33,15 @@ export function Home({onNew,onOpen,onLibrary}:{onNew:(keyword:string)=>void;onOp
   </motion.section>
   <section className="blogs">
    <div className="blogs-head"><h2>Your blogs</h2><button className="link-btn" onClick={onLibrary}>See all {articles.length}<ArrowRight size={14}/></button></div>
-   {blogs.length?<div className="blog-grid">{blogs.map((a,i)=><BlogCard key={a.id} a={a} i={i} onOpen={onOpen} onContinue={onNew}/>)}</div>
+   {blogs.length?<div className="blog-grid">{blogs.map((a,i)=><BlogCard key={a.id} a={a} i={i} onOpen={onOpen} onContinue={onResume}/>)}</div>
     :<div className="empty-blogs"><strong>No blogs yet</strong><p>Type a keyword above. Your first blog shows up here as soon as you start it.</p></div>}
   </section>
  </div>;
 }
 
-function BlogCard({a,i,onOpen,onContinue}:{a:Article;i:number;onOpen:(id:string)=>void;onContinue:(kw:string)=>void}){
+function BlogCard({a,i,onOpen,onContinue}:{a:Article;i:number;onOpen:(id:string)=>void;onContinue:(id:string)=>void}){
  const draft=a.status==='In progress',yours=a.waiting==='you';
- const line=draft?(yours?`Next: ${a.next?.toLowerCase()}`:a.next):a.status==='Ready'?'Ready to publish':a.status==='Scheduled'?`Goes live ${a.scheduledFor}`:`Published ${a.publishedAt}`;
+ const line=draft?(yours?`Next: ${a.next?.toLowerCase()}`:a.next):a.status==='Ready'?'Ready to publish':a.status==='Scheduled'?`Goes live ${whenExact(a.scheduledFor)}`:`Published ${when(a.publishedAt)}`;
  return <motion.article className={`blog-card ${draft?'is-draft':''} ${yours?'is-yours':''}`} initial={{opacity:0,y:18}} animate={{opacity:1,y:0}} transition={{delay:.12+i*.06,duration:.5,ease}} onClick={()=>onOpen(a.id)}>
   <div className={`cover ${draft?'draft':`t${i%4}`}`}>
    {draft?<StepTrack step={a.step||1} working={!yours} size="sm"/>:<span className="cover-art" aria-hidden="true"><i/><i/><i/></span>}
@@ -52,7 +52,7 @@ function BlogCard({a,i,onOpen,onContinue}:{a:Article;i:number;onOpen:(id:string)
    <p className={`blog-line ${yours?'yours':''} ${a.status==='Ready'?'ready':''}`}>{draft&&!yours&&<LoaderCircle className="spin" size={14}/>}{line}</p>
   </div>
   <div className="blog-foot" onClick={e=>e.stopPropagation()}>
-   {draft&&yours&&<button className="button primary compact" onClick={()=>onContinue(a.keyword)}>Continue<ArrowRight size={15}/></button>}
+   {draft&&yours&&<button className="button primary compact" onClick={()=>onContinue(a.id)}>Continue<ArrowRight size={15}/></button>}
    {a.status==='Ready'&&<button className="button primary compact" onClick={()=>onOpen(a.id)}>Publish<ArrowRight size={15}/></button>}
    {(a.status==='Published'||a.status==='Scheduled')&&<button className="button secondary compact" onClick={()=>onOpen(a.id)}>Open</button>}
    {draft&&!yours&&<span className="blog-wait">We will tell you when it is ready</span>}

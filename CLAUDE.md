@@ -6,15 +6,18 @@ Blog automation for SaaS companies. Vite 7 + React 19 + TypeScript + motion. The
 - `npm install`, then `npm run dev` (http://127.0.0.1:5180). `npm run typecheck` must pass.
 - Writing model: `server/llm.ts`. Claude when `ANTHROPIC_API_KEY` is set; otherwise any OpenAI-compatible endpoint from `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`. Never add provider-specific logic to research or writing code.
 
-## How data is stored today (no database yet)
+## How data is stored
 | Data | Where | File |
 |---|---|---|
-| Current company (name, domain, logo, user brief `md`, saved research summary) and its articles | Browser `localStorage`, key `comarketer.workspace.v2` | `src/workspace.ts` (`useWorkspace`, `setWorkspace`, `saveArticle`) |
+| Companies (name, domain, logo, brief `md`), their articles (status, plan, finished `content`, publish links, dates, archive) and each article's history | Postgres: PGlite in `.data/pglite` (gitignored) by default, or `DATABASE_URL` (Supabase). Same SQL for both | `server/db/` (schema in `server/db/migrations/`); browser side `src/workspace.ts` (`useWorkspace`, `saveArticle`, `archiveArticles`, `loadArticle`, ...) |
+| Browser copy for instant loads (no article content) | `localStorage`, key `comarketer.workspace.v3`. Older `v2` data is moved into the database once | `src/workspace.ts` |
 | Research: every page read, `context.md` (user brief), `context-full.md` (internal brief), `status.json` | Disk: `research-store/<domain>/` (gitignored) | `server/research.ts` |
 | Blog platform connections (keys) | Disk: `.secrets/connections.json` (gitignored, mode 600) | `server/connections.ts` |
-| Article content | Rebuilt from preview content per keyword and title; not stored | `src/sample.ts`, `src/post.ts`, `src/article-data.ts` |
+| Article content | Built from preview content (`src/sample.ts`) when the draft finishes, then saved as a `Post` in `articles.content`; edits and SEO changes update it | `src/article-data.ts`, `src/post.ts` |
 
-The `Article` type is in `src/data.ts`. The content library is `src/screens/Library.tsx` (list, filters, search, article page with Publish, Details, SEO and GEO, Images, Sources, History tabs).
+New tables or columns go in a new numbered file in `server/db/migrations/`. Never edit one that has already run. See `DATABASE.md`.
+
+The `Article` type is in `src/data.ts`. The content library is `src/screens/Library.tsx`: list with status tabs, Archived, search, bulk archive, restore and delete, and the article page (edit in place, Publish with schedule, Details, SEO and GEO, Images, Sources, History). Articles in progress reopen where they were left (`Workflow` with `articleId`).
 
 ## Rules from the product owner
 - Plain, value-focused copy in the UI. No internal process words (angle, evidence, memory). Never "your turn".
@@ -25,4 +28,4 @@ The `Article` type is in `src/data.ts`. The content library is `src/screens/Libr
 - Design tokens are in `src/styles.css` (ivory, ink, cobalt blue, butter). Readable type sizes, calm motion, light and dark care.
 
 ## Docs
-`PLAN.md` (product and UX), `CONTENT_ENGINE.md` (prompt layers), `CMS_INTEGRATIONS.md` (publishing), `prompts/README.md` (all writing instructions).
+`PLAN.md` (product and UX), `DATABASE.md` (database choice, tables, API), `CONTENT_ENGINE.md` (prompt layers), `CMS_INTEGRATIONS.md` (publishing), `prompts/README.md` (all writing instructions).

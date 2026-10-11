@@ -1,5 +1,6 @@
 // Shared types and presets. Nothing here is about a specific company: company facts come from the brief (workspace.ts).
 import {isThing,tc,year} from './sample';
+import type {Post} from './post';
 
 export type Voice='founder'|'team';
 export const workflowSteps=['Plan','Research','Blog structure','Draft'];
@@ -31,7 +32,11 @@ export const suggestType=(kw:string):BlogType=>{
 };
 
 export type Status='In progress'|'Ready'|'Scheduled'|'Published';
-export type Article={id:string;title:string;keyword:string;status:Status;step?:number;waiting?:'you'|'us';next?:string;voice?:Voice;words?:number;quality?:number;sources?:number;images?:number;created:string;updated:string;scheduledFor?:string;publishedAt?:string;slug?:string;cms?:string;liveUrl?:string;editUrl?:string};
+// Dates are ISO strings. `content` is the finished article, saved once the draft is written and every time it is edited.
+// The content library list leaves it out; the article page loads it.
+export type Article={id:string;title:string;keyword:string;status:Status;step?:number;waiting?:'you'|'us';next?:string;voice?:Voice;words?:number;quality?:number;sources?:number;images?:number;created:string;updated:string;scheduledFor?:string;publishedAt?:string;archivedAt?:string;slug?:string;cms?:string;externalId?:string;liveUrl?:string;editUrl?:string;plan?:ArticlePlan;content?:Post};
+// Everything picked so far, so an article in progress opens exactly where it was left.
+export type ArticlePlan={phase:string;btype?:BlogType;answers?:Record<string,string>;angle?:string|null;outline?:string;memory?:string[];reached?:number};
 
 export function voicesFor(name:string){
  return {

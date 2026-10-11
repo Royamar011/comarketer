@@ -631,3 +631,14 @@ button.finding-src{color:var(--blue-ink)}button.finding-src:hover{text-decoratio
 .conn-ok{display:flex;align-items:center;gap:8px;color:var(--success)}.hint{display:grid;gap:10px;justify-items:start;padding:12px;border-radius:12px;background:var(--butter-soft);border:1px solid var(--butter-line);font-size:13px;line-height:19px;color:#4D4710}
 .wf-map{display:grid;gap:10px}.wf-map select,.drawer select{width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:10px;background:#fff;font:inherit}
 .muted.small{font-size:12px}
+
+/* Saving, archive, scheduling and SEO save (database-backed content library) */
+.sync{margin-left:10px;font-size:12px;color:var(--faint)}.sync-saving,.sync-loading{color:var(--muted)}.sync-error{color:#B3342B}
+.sync-warn{margin-bottom:12px;padding:10px 14px;border-radius:12px;background:#FDEDE9;border:1px solid #F3C9C0;font-size:14px;color:#8A2B22}
+.s-archived{background:var(--stone-2);color:var(--faint)}
+.lib-search .icon-button{width:24px;height:24px;color:var(--faint)}
+.pub-schedule{display:flex;align-items:flex-end;gap:8px;flex-basis:100%;flex-wrap:wrap;overflow:hidden;padding-top:4px}
+.pub-schedule .field{flex:1;min-width:200px}.pub-warn a{color:inherit;font-weight:550}
+.seo-save{display:flex;justify-content:flex-end;gap:8px;margin:-4px 0 16px}
+.field small.over{color:#8A6D10}
+.facts dd a{color:var(--blue);word-break:break-all}

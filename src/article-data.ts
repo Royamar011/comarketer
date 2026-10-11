@@ -4,16 +4,21 @@ import {makeSample,samplePost} from './sample';
 import {renderCard,dataToBytes,extOf} from './cards';
 import {toHTML,toMarkdown,toPage,toJsonLd,type Post} from './post';
 import {makeZip} from './zip';
-import {useWorkspace} from './workspace';
+import {useWorkspace,type Workspace} from './workspace';
 
-// The article for a keyword and title, plus its rendered images (data URLs).
-export function useArticle(keyword:string,title:string,voice:Voice){
+// The article for a keyword and title, built from the preview content and the company in the brief.
+export function buildPost(keyword:string,title:string,voice:Voice,ws:Pick<Workspace,'name'|'domain'|'logo'>):Post{
+ const S=makeSample(keyword,ws.name,ws.domain),v=voicesFor(ws.name)[voice||'team'];
+ return samplePost(S,{title,byline:`${v.byline} · ${new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}`,author:voice==='founder'?{name:'The founder',type:'Person'}:{name:`${ws.name} team`,type:'Organization'},company:{name:ws.name,url:ws.domain?`https://${ws.domain}`:'',logo:ws.logo}});
+}
+export const countWords=(post:Post)=>[post.title,...post.blocks.flatMap(b=>'text' in b?[b.text]:'items' in b?b.items:'rows' in b?b.rows.flat():[]),...post.faq.flatMap(f=>[f.q,f.a])].join(' ').split(/\s+/).filter(Boolean).length;
+
+// The article and its rendered images (data URLs). Uses the saved content when there is some.
+export function useArticle(keyword:string,title:string,voice:Voice,saved?:Post){
  const ws=useWorkspace();
- const post=useMemo(()=>{const S=makeSample(keyword,ws.name,ws.domain),v=voicesFor(ws.name)[voice||'team'];
-  return samplePost(S,{title,byline:`${v.byline} · ${new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}`,author:voice==='founder'?{name:'The founder',type:'Person'}:{name:`${ws.name} team`,type:'Organization'},company:{name:ws.name,url:ws.domain?`https://${ws.domain}`:'',logo:ws.logo}});
- },[keyword,title,voice,ws.name,ws.domain,ws.logo]);
+ const post=useMemo(()=>saved||buildPost(keyword,title,voice,ws),[saved,keyword,title,voice,ws.name,ws.domain,ws.logo]);
  const [images,setImages]=useState<string[]>([]);
- useEffect(()=>{let live=true;setImages([]);Promise.all(post.images.map(im=>renderCard(im,ws.name,post.keyword))).then(x=>{if(live)setImages(x);});return()=>{live=false;};},[post]);
+ useEffect(()=>{let live=true;setImages([]);Promise.all(post.images.map(im=>renderCard(im,ws.name,post.keyword))).then(x=>{if(live)setImages(x);});return()=>{live=false;};},[post.images,post.keyword,ws.name]);
  return {post,images,ready:images.length===post.images.length};
 }
 

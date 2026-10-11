@@ -10,7 +10,9 @@ cp .env.example .env   # add ANTHROPIC_API_KEY
 npm run dev
 ```
 
-Open http://127.0.0.1:5180. Screens have hash links: `#onboarding`, `#home`, `#new`, `#library`, `#context`, `#styles`, `#settings`.
+Open http://127.0.0.1:5180. Screens have hash links: `#onboarding`, `#home`, `#new`, `#library`, `#article/<id>`, `#context`, `#styles`, `#settings`.
+
+No database setup is needed: data is kept in `.data/`. To use Supabase, set `DATABASE_URL` in `.env` (see `DATABASE.md`).
 
 ## What is real today
 
@@ -21,7 +23,9 @@ Open http://127.0.0.1:5180. Screens have hash links: `#onboarding`, `#home`, `#n
 | Article steps (top results, ideas, titles, research, structure, draft) | Preview content built from the keyword and company. Search is not connected yet |
 | Article images | Real PNG and JPEG files with matching alt text (`src/cards.ts`) |
 | Copy with formatting, Copy HTML, Copy Markdown, Download .zip | Real |
-| Publishing to WordPress, Webflow, HubSpot, Ghost | Real (`server/publish.ts`). Tested against stand-in APIs; try a live account with "Send as draft" |
+| Publishing to WordPress, Webflow, HubSpot, Ghost | Real (`server/publish.ts`). Draft, publish now, or schedule (not Webflow). Tested against stand-in APIs; try a live account with "Send as draft" |
+| Database: companies, articles, edits, history | Real. Built-in Postgres in `.data/` with no setup, or Supabase via `DATABASE_URL` (`DATABASE.md`) |
+| Content library: search, filters, archive, restore, delete, duplicate, edit, SEO fields, history | Real, saved to the database |
 
 ## Where things are
 
@@ -29,6 +33,8 @@ Open http://127.0.0.1:5180. Screens have hash links: `#onboarding`, `#home`, `#n
 - `server/research.ts` Website research and brief writing
 - `server/llm.ts` The writing model, behind one interface
 - `server/publish.ts`, `server/connections.ts`, `server/api.ts` Blog platform publishing and connections (keys are kept in `.secrets/`, never in the browser)
+- `server/db/` The database: driver, migrations, reads and writes, API routes
+- `src/workspace.ts` The browser side of the database: instant updates, saved in order in the background
 - `src/post.ts` One article format, rendered to HTML, Markdown, WordPress blocks and JSON-LD
 - `src/screens/` Onboarding, the article workflow, Home, Library, Company brief, Voices, Settings
 - `integrations/wordpress/` Small plugin that lets Comarketer set Yoast or Rank Math SEO fields
@@ -38,7 +44,8 @@ Open http://127.0.0.1:5180. Screens have hash links: `#onboarding`, `#home`, `#n
 - `PLAN.md` Product, UX and AI pipeline plan
 - `CONTENT_ENGINE.md` How the writing skill maps to the API and the prompt layers
 - `CMS_INTEGRATIONS.md` Blog platform research and how each integration works
+- `DATABASE.md` Why Supabase, the tables, and the API
 
 ## Not committed
 
-`.env` (keys), `.secrets/` (blog platform connections), `research-store/` (saved website research) and `node_modules/`.
+`.env` (keys), `.secrets/` (blog platform connections), `research-store/` (saved website research), `.data/` (the local database) and `node_modules/`.

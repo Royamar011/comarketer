@@ -3,6 +3,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 
 export type Platform='wordpress'|'webflow'|'hubspot'|'ghost';
+export const platformNames:Record<Platform,string>={wordpress:'WordPress',webflow:'Webflow',hubspot:'HubSpot',ghost:'Ghost'};
 export type Connection={platform:Platform;creds:Record<string,string>;settings:Record<string,any>;label:string;connectedAt:string};
 const FILE=path.resolve('.secrets/connections.json');
 

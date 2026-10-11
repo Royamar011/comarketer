@@ -4,22 +4,25 @@ import {ArrowRight,BookOpen,Columns2,Lightbulb,ListOrdered,Shuffle,Brain,Check,C
 import {Keyword,Nudge,OurPick,Ring,Ticker,TypeStream,WorkList,ease,spring,useSteps} from '../components/ui';
 import {ArticleBody} from '../components/article';
 import {PublishPanel} from '../components/publish';
-import {copyFormatted,useArticle} from '../article-data';
+import {buildPost,copyFormatted,countWords,useArticle} from '../article-data';
 import {Tick,stepIcons} from '../components/steps';
 import {Making,type MakeKind} from '../components/making';
-import {blogTypesFor,suggestType,voicesFor,workflowSteps,type BlogType,type Voice} from '../data';
-import {makeSample,slugify,type Sample} from '../sample';
-import {saveArticle,useWorkspace,type Workspace} from '../workspace';
+import {blogTypesFor,suggestType,voicesFor,workflowSteps,type ArticlePlan,type BlogType,type Voice} from '../data';
+import {makeSample,type Sample} from '../sample';
+import {getWorkspace,saveArticle,useWorkspace,type Workspace} from '../workspace';
 type Phase='start'|'type'|'scan'|'angle'|'title'|'research'|'structure'|'voice'|'writing'|'ready';
 const order:Phase[]=['start','type','scan','angle','title','research','structure','voice','writing','ready'];
-type Ctx={S:Sample;voices:ReturnType<typeof voicesFor>;ws:Workspace;blogTypes:ReturnType<typeof blogTypesFor>};
+type Ctx={S:Sample;voices:ReturnType<typeof voicesFor>;ws:Workspace;blogTypes:ReturnType<typeof blogTypesFor>;id:string};
 const StepCtx=createContext<Ctx|null>(null),useCtx=()=>useContext(StepCtx)!;
 
-export function Workflow({initialKeyword,defaultVoice,onExit,onToast}:{initialKeyword:string;defaultVoice:Voice;onExit:()=>void;onToast:(t:string)=>void}){
- const [phase,setPhase]=useState<Phase>(initialKeyword?'type':'start'),[keyword,setKeyword]=useState(initialKeyword),[voice,setVoice]=useState<Voice>(defaultVoice);
- const [btype,setBtype]=useState<BlogType>(suggestType(initialKeyword)),[answers,setAnswers]=useState<Record<string,string>>({}),[angle,setAngle]=useState<string|null>(null),[title,setTitle]=useState<string|null>(null),[outline,setOutline]=useState('framework'),[memory,setMemory]=useState<string[]>([]),[memoryOpen,setMemoryOpen]=useState(false),[reached,setReached]=useState(0);
- const ws=useWorkspace(),S=useMemo(()=>makeSample(keyword,ws.name,ws.domain),[keyword,ws.name,ws.domain]),voices=voicesFor(ws.name),blogTypes=blogTypesFor(keyword,ws.name),ctx={S,voices,ws,blogTypes};
- const made=useRef(new Set<string>()),dir=useRef(1),artId=useRef(`a${Date.now()}`);
+// With an articleId, the article opens where it was left: same choices, same step, same entry in the library.
+export function Workflow({initialKeyword,articleId,defaultVoice,onExit,onToast}:{initialKeyword:string;articleId?:string;defaultVoice:Voice;onExit:()=>void;onToast:(t:string)=>void}){
+ const [saved]=useState(()=>articleId?getWorkspace().articles.find(a=>a.id===articleId):undefined),p:Partial<ArticlePlan>=saved?.plan||{};
+ const resume=saved&&order.includes(p.phase as Phase)&&p.phase!=='start'?p.phase as Phase:null,kw0=saved?.keyword??initialKeyword;
+ const [phase,setPhase]=useState<Phase>(resume||(kw0?'type':'start')),[keyword,setKeyword]=useState(kw0),[voice,setVoice]=useState<Voice>(saved?.voice||defaultVoice);
+ const [btype,setBtype]=useState<BlogType>(p.btype||suggestType(kw0)),[answers,setAnswers]=useState<Record<string,string>>(p.answers||{}),[angle,setAngle]=useState<string|null>(p.angle??null),[title,setTitle]=useState<string|null>(resume&&order.indexOf(resume)>4?saved!.title:null),[outline,setOutline]=useState(p.outline||'framework'),[memory,setMemory]=useState<string[]>(p.memory||[]),[memoryOpen,setMemoryOpen]=useState(false),[reached,setReached]=useState(p.reached||0);
+ const ws=useWorkspace(),S=useMemo(()=>makeSample(keyword,ws.name,ws.domain),[keyword,ws.name,ws.domain]),voices=voicesFor(ws.name),blogTypes=blogTypesFor(keyword,ws.name);
+ const made=useRef(new Set<string>(resume?['angle',`title-${p.angle}`,'structure']:[])),dir=useRef(1),artId=useRef(saved?.id||(crypto.randomUUID?.()??`a${Date.now()}`)),ctx={S,voices,ws,blogTypes,id:artId.current};
  const remember=(items:string[])=>setMemory(m=>[...m,...items.filter(i=>!m.includes(i))]);
  const go=(p:Phase)=>{dir.current=order.indexOf(p)>=order.indexOf(phase)?1:-1;setPhase(p);setReached(r=>Math.max(r,order.indexOf(p)));document.querySelector('.studio-main')?.scrollTo({top:0});window.scrollTo({top:0,behavior:'smooth'});};
  const typeObj=blogTypes.find(t=>t.id===btype)!,idx=order.indexOf(phase),angleObj=S.angles.find(a=>a.id===angle),outlineObj=S.outlines.find(o=>o.id===outline);
@@ -28,9 +31,12 @@ export function Workflow({initialKeyword,defaultVoice,onExit,onToast}:{initialKe
  useEffect(()=>{if(stepNo>prevStep.current){setBanner(prevStep.current);const t=setTimeout(()=>setBanner(null),2600);prevStep.current=stepNo;return()=>clearTimeout(t);}prevStep.current=stepNo;},[stepNo]);
  // Every blog started here appears in Home and the content library, and shows where it stands.
  useEffect(()=>{if(phase==='start'||phase==='type')return;
-  const base={id:artId.current,keyword,title:title||S.K};
-  const by:Record<string,object>={scan:{step:1,waiting:'us',next:'Checking the top results'},angle:{step:1,waiting:'you',next:'Pick an idea'},title:{step:1,waiting:'you',next:'Pick a title'},research:{step:2,waiting:'us',next:'Research in progress'},structure:{step:3,waiting:'you',next:'Pick a blog structure'},voice:{step:4,waiting:'you',next:'Choose who is writing'},writing:{step:4,waiting:'us',next:'Draft in progress'},
-   ready:{status:'Ready',step:undefined,waiting:undefined,next:undefined,voice,words:1980,quality:96,sources:S.research.length,images:S.images.length,slug:slugify(title||S.K)}};
+  // Opening a finished article again must not overwrite its saved, maybe edited, content.
+  if(saved&&saved.status!=='In progress')return;
+  const plan:ArticlePlan={phase,btype,answers,angle,outline,memory,reached},base={id:artId.current,keyword,title:title||S.K,plan};
+  if(phase==='ready'){const content=buildPost(keyword,title||S.K,voice,ws);
+   saveArticle({...base,status:'Ready',step:undefined,waiting:undefined,next:undefined,voice,content,words:countWords(content),quality:96,sources:S.research.length,images:S.images.length,slug:content.slug});return;}
+  const by:Record<string,object>={scan:{step:1,waiting:'us',next:'Checking the top results'},angle:{step:1,waiting:'you',next:'Pick an idea'},title:{step:1,waiting:'you',next:'Pick a title'},research:{step:2,waiting:'us',next:'Research in progress'},structure:{step:3,waiting:'you',next:'Pick a blog structure'},voice:{step:4,waiting:'you',next:'Choose who is writing'},writing:{step:4,waiting:'us',next:'Draft in progress'}};
   saveArticle({...base,status:'In progress',...by[phase]});
  },[phase,title]);
  const steps=[
@@ -66,7 +72,7 @@ export function Workflow({initialKeyword,defaultVoice,onExit,onToast}:{initialKe
      {phase==='structure'&&<Gen id="structure" kind="structure" made={made}><Structure outline={outline} setOutline={setOutline} onNext={()=>{remember([`Blog structure: ${outlineObj?.name}`]);go('voice');}}/></Gen>}
      {phase==='voice'&&<VoiceStep voice={voice} setVoice={setVoice} onNext={()=>{remember([`Voice: ${voices[voice].name}`]);go('writing');}}/>}
      {phase==='writing'&&<Writing title={title||''} onDone={()=>{remember(['Full draft','4 images with alt text','SEO title, meta and slug','FAQ schema']);go('ready');}}/>}
-     {phase==='ready'&&<Ready title={title||''} voice={voice} onToast={onToast} onExit={onExit}/>}
+     {phase==='ready'&&<Ready voice={voice} onToast={onToast} onExit={onExit}/>}
     </motion.div>
    </AnimatePresence>
   </div>
@@ -220,13 +226,13 @@ function FactCheck({onDone}:{onDone:()=>void}){
  </motion.section>;
 }
 
-function Ready({title,voice,onToast,onExit}:{title:string;voice:Voice;onToast:(t:string)=>void;onExit:()=>void}){
- const {S}=useCtx(),{post,images,ready}=useArticle(S.k,title,voice);
+function Ready({voice,onToast,onExit}:{voice:Voice;onToast:(t:string)=>void;onExit:()=>void}){
+ const {S,ws,id}=useCtx(),a=ws.articles.find(x=>x.id===id),{post,images,ready}=useArticle(S.k,a?.title||'',voice,a?.content);
  const [tab,setTab]=useState<'publish'|'images'|'quality'>('publish');
  return <>
   <motion.div className="ready-banner" initial={{opacity:0,y:-8}} animate={{opacity:1,y:0}} transition={{duration:.45,ease}}>
    <span className="ready-check"><svg viewBox="0 0 24 24"><motion.path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" initial={{pathLength:0}} animate={{pathLength:1}} transition={{duration:.55,delay:.2}}/></svg></span>
-   <div><strong>Ready to publish</strong><p><Ticker value={1980}/> words · <Ticker value={post.images.length}/> images with alt text · <Ticker value={post.faq.length}/> FAQs · <Ticker value={S.research.length}/> sources cited · every fact checked</p></div>
+   <div><strong>Ready to publish</strong><p><Ticker value={countWords(post)}/> words · <Ticker value={post.images.length}/> images with alt text · <Ticker value={post.faq.length}/> FAQs · <Ticker value={S.research.length}/> sources cited · every fact checked</p></div>
    <button className="button primary" disabled={!ready} onClick={async()=>{try{await copyFormatted(post,images);onToast('Copied with formatting and images. Paste into Google Docs, WordPress or Notion.');}catch{onToast('Your browser blocked the clipboard. Use Download instead.');}}}><Copy size={16}/>Copy article</button>
   </motion.div>
   <div className="ready-layout">
@@ -235,7 +241,7 @@ function Ready({title,voice,onToast,onExit}:{title:string;voice:Voice;onToast:(t
     <div className="tabs" role="tablist">{([['publish','Publish',Globe],['images','Images',ImageIcon],['quality','Quality',ListChecks]] as const).map(([id,label,Icon])=><button key={id} role="tab" aria-selected={tab===id} className={tab===id?'active':''} onClick={()=>setTab(id)}><Icon size={15}/>{label}{tab===id&&<motion.i layoutId="ready-tab" className="tab-line"/>}</button>)}</div>
     <AnimatePresence mode="wait"><motion.div key={tab} className="side-body" initial={{opacity:0,y:6}} animate={{opacity:1,y:0}} exit={{opacity:0}} transition={{duration:.2}}>
      {tab==='publish'&&<>
-      <PublishPanel post={post} images={images} ready={ready} onToast={onToast} onSettings={()=>{location.hash='settings';}}/>
+      <PublishPanel article={a} post={post} images={images} ready={ready} onToast={onToast} onSettings={()=>{location.hash='settings';}}/>
       <dl className="seo-facts"><div><dt>SEO title</dt><dd>{post.metaTitle}<small>{post.metaTitle.length} of 60 characters</small></dd></div><div><dt>Meta description</dt><dd>{post.metaDescription}<small>{post.metaDescription.length} characters</small></dd></div><div><dt>Slug</dt><dd className="mono">/{post.slug}</dd></div></dl>
      </>}
      {tab==='images'&&<>{post.images.map((im,i)=><div key={im.name} className="image-row">{images[i]?<img className="thumb-img" src={images[i]} alt=""/>:<span className="thumb"/>}<div><label className="field compact">Alt text<textarea rows={2} defaultValue={im.alt}/></label><small className="muted">{i===post.featured?'Featured image':S.images[i].place}</small></div></div>)}</>}
