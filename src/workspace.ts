@@ -1,5 +1,6 @@
 import {useEffect,useState,useSyncExternalStore} from 'react';
 import type {Article} from './data';
+import type {Problem} from './components/ui';
 
 // The current company: its brief (context.md), what research saved, and its articles. The database on the server is
 // the record (server/db). This keeps a copy in the browser so pages open instantly, and shows every change straight away
@@ -35,11 +36,11 @@ async function api<T=any>(path:string,body?:unknown):Promise<T>{
 }
 
 // Writes run one after another, so the database ends up in the same order as the screen.
-let chain:Promise<unknown>=Promise.resolve(),inflight=0,failed=false;
+let chain:Promise<unknown>=Promise.resolve(),inflight=0,failed=false,lastError='';
 const pending=new Map<string,number>();
 function queue<T>(ids:string[],run:()=>Promise<T>):Promise<T|null>{
  inflight++;ids.forEach(id=>pending.set(id,(pending.get(id)||0)+1));set({sync:'saving'});
- const p=chain.then(run).then(r=>{failed=false;return r;},e=>{failed=true;console.error(e);return null;});
+ const p=chain.then(run).then(r=>{failed=false;return r;},e=>{failed=true;lastError=(e as Error).message||String(e);console.error(e);return null;});
  chain=p;
  return p.then(r=>{inflight--;ids.forEach(id=>{const n=(pending.get(id)||1)-1;n?pending.set(id,n):pending.delete(id);});set({sync:inflight?'saving':failed?'error':'saved'});return r;});
 }
@@ -113,6 +114,17 @@ export function useArticleEvents(id:string,version:string){
  },[id,version]);
  return events;
 }
+
+// Why the last save failed, in plain words, with what to do. `what` finishes "Couldn't …".
+// `kept`: the change is still on screen (edits), rather than undone (archive, delete).
+const unreachable=(m:string)=>/fetch|not responding|NetworkError|Load failed/i.test(m);
+export function saveProblem(what:string,o:{retry?:()=>void;kept?:boolean}={}):Problem{
+ const off=unreachable(lastError);
+ return {title:`Couldn't ${what}`,retry:o.retry,details:off?undefined:lastError||undefined,
+  fix:off?`We can't reach the Comarketer server${o.kept?'. Your changes are still on this page.':', so nothing changed.'} Make sure it is running (npm run dev), then try again.`
+   :`The database didn't accept it${o.kept?'. Your changes are still on this page.':', so nothing changed.'} Try again. If it keeps happening, share the details with whoever runs Comarketer.`};
+}
+export const lastSaveError=()=>lastError;
 
 // "just now", "5 min ago", "Today 10:12", "Yesterday", "11 Oct", "11 Oct 2025".
 export function when(iso?:string){

@@ -1,14 +1,14 @@
 import {useEffect,useMemo,useRef,useState} from 'react';
 import {AnimatePresence,motion} from 'motion/react';
 import {ArrowLeft,ArrowRight,Archive,ArchiveRestore,Check,Copy,Download,ExternalLink,LoaderCircle,MoreHorizontal,Pencil,Search,Send,ShieldCheck,Sparkles,Trash2,Globe,BookOpen,X} from 'lucide-react';
-import {Keyword,Skel,Ticker,ease,spring} from '../components/ui';
+import {Keyword,ProblemCard,Skel,Ticker,ease,spring,type Notice} from '../components/ui';
 import {ArticleBody,readEdits} from '../components/article';
 import {StepTrack} from '../components/steps';
 import {voicesFor,workflowSteps,type Article,type Status} from '../data';
 import {makeSample,slugify} from '../sample';
 import {PublishPanel,platformNames} from '../components/publish';
 import {countWords,downloadZip,useArticle} from '../article-data';
-import {archiveArticles,deleteArticles,duplicateArticle,loadArticle,restoreArticles,saveArticle,useArticleEvents,useWorkspace,when,whenExact} from '../workspace';
+import {archiveArticles,deleteArticles,duplicateArticle,lastSaveError,loadArticle,restoreArticles,saveArticle,saveProblem,useArticleEvents,useWorkspace,when,whenExact} from '../workspace';
 type Filter='All'|Status|'Archived';
 const filters:Filter[]=['All','In progress','Ready','Scheduled','Published','Archived'];
 
@@ -33,7 +33,7 @@ function ConfirmButton({label,confirm,onConfirm,className='button ghost danger'}
  return <button className={className} onClick={()=>armed?onConfirm():setArmed(true)}><Trash2 size={15}/>{armed?confirm:label}</button>;
 }
 
-export function Library({onOpen,onNew,onResume,onToast}:{onOpen:(id:string)=>void;onNew:()=>void;onResume:(id:string)=>void;onToast:(t:string)=>void}){
+export function Library({onOpen,onNew,onResume,onToast}:{onOpen:(id:string)=>void;onNew:()=>void;onResume:(id:string)=>void;onToast:(t:Notice)=>void}){
  const ws=useWorkspace(),voices=voicesFor(ws.name);
  const [filter,setFilter]=useState<Filter>('All'),[q,setQ]=useState(''),[picked,setPicked]=useState<string[]>([]);
  const live=useMemo(()=>ws.articles.filter(a=>!a.archivedAt).sort(byNewest),[ws.articles]),archived=useMemo(()=>ws.articles.filter(a=>a.archivedAt).sort(byNewest),[ws.articles]);
@@ -44,18 +44,18 @@ export function Library({onOpen,onNew,onResume,onToast}:{onOpen:(id:string)=>voi
  // Selections only count for rows on screen.
  const shown=picked.filter(id=>list.some(a=>a.id===id));
  const n=(k:number)=>`${k} ${k===1?'article':'articles'}`;
- const act=async(run:(ids:string[])=>Promise<boolean>,done:string)=>{const ids=shown;setPicked([]);onToast((await run(ids))?done:'That did not save. Check the dev server is running, then try again.');};
- const duplicate=async(id:string)=>{const a=await duplicateArticle(id);onToast(a?'Duplicated. The copy is at the top of the list.':'Could not duplicate. Try again.');};
+ const act=async(run:(ids:string[])=>Promise<boolean>,done:string,what:string,list=shown)=>{setPicked([]);const go=async()=>onToast((await run(list))?done:saveProblem(what,{retry:go}));await go();};
+ const duplicate=async(id:string)=>{const go=async()=>{const a=await duplicateArticle(id);onToast(a?'Duplicated. The copy is at the top of the list.':saveProblem('duplicate this article',{retry:go}));};await go();};
  return <div className="library">
-  {ws.sync==='error'&&<p className="sync-warn">Changes could not be saved to the database. Check the dev server is running. They are kept on this page until it reconnects.</p>}
+  {ws.sync==='error'&&<div className="lib-problem"><ProblemCard problem={{title:'Your last change wasn’t saved',fix:'It is still showing here, but the database doesn’t have it yet. Make sure the Comarketer server is running (npm run dev), then make the change again.',details:lastSaveError()||undefined}}/></div>}
   <div className="lib-bar">
    <div className="lib-tabs" role="tablist">{filters.filter(f=>f!=='Archived'||archived.length||filter==='Archived').map(f=><button key={f} role="tab" aria-selected={filter===f} className={filter===f?'on':''} onClick={()=>{setFilter(f);setPicked([]);}}>{f}<b><Ticker value={count(f)}/></b>{filter===f&&<motion.i layoutId="lib-tab" className="lib-tab-line" transition={spring}/>}</button>)}</div>
    <label className="lib-search"><Search size={16}/><input aria-label="Search content" placeholder="Search titles and keywords" value={q} onChange={e=>setQ(e.target.value)}/>{q&&<button className="icon-button" aria-label="Clear search" onClick={()=>setQ('')}><X size={14}/></button>}</label>
   </div>
   <AnimatePresence>{shown.length>0&&<motion.div className="bulk" initial={{opacity:0,y:-6}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-6}} transition={{duration:.2}}>
    <strong>{shown.length} selected</strong>
-   {filter==='Archived'?<><button onClick={()=>act(restoreArticles,`${n(shown.length)} restored.`)}><ArchiveRestore size={15}/>Restore</button><ConfirmButton className="" label="Delete forever" confirm={`Delete ${n(shown.length)}?`} onConfirm={()=>act(deleteArticles,`${n(shown.length)} deleted.`)}/></>
-    :<button onClick={()=>act(archiveArticles,`${n(shown.length)} archived. Find them under Archived.`)}><Archive size={15}/>Archive</button>}
+   {filter==='Archived'?<><button onClick={()=>act(restoreArticles,`${n(shown.length)} restored.`,`restore ${n(shown.length)}`)}><ArchiveRestore size={15}/>Restore</button><ConfirmButton className="" label="Delete forever" confirm={`Delete ${n(shown.length)}?`} onConfirm={()=>act(deleteArticles,`${n(shown.length)} deleted.`,`delete ${n(shown.length)}`)}/></>
+    :<button onClick={()=>act(archiveArticles,`${n(shown.length)} archived. Find them under Archived.`,`archive ${n(shown.length)}`)}><Archive size={15}/>Archive</button>}
    <button className="bulk-clear" onClick={()=>setPicked([])}>Clear</button>
   </motion.div>}</AnimatePresence>
   <div className="lib-table" role="table" aria-label="Content">
@@ -64,7 +64,7 @@ export function Library({onOpen,onNew,onResume,onToast}:{onOpen:(id:string)=>voi
    <AnimatePresence initial={false} mode="popLayout">{list.map((a,i)=><motion.div key={a.id} layout role="row" className={`lib-row ${picked.includes(a.id)?'picked':''}`} initial={{opacity:0,y:6}} animate={{opacity:1,y:0,transition:{delay:Math.min(i,12)*.03,duration:.3,ease}}} exit={{opacity:0,scale:.98,transition:{duration:.15}}} transition={{layout:{duration:.3,ease}}} onClick={()=>onOpen(a.id)}>
     <span role="cell" onClick={e=>e.stopPropagation()}><input type="checkbox" aria-label={`Select ${a.title}`} checked={picked.includes(a.id)} onChange={()=>toggle(a.id)}/></span>
     <span role="cell" className="lib-title"><strong>{a.title}</strong><Keyword size="sm" muted>{a.keyword}</Keyword>
-     <span className="row-actions" onClick={e=>e.stopPropagation()}>{a.archivedAt?<button onClick={async()=>onToast((await restoreArticles([a.id]))?'Restored.':'Could not restore. Try again.')}>Restore</button>
+     <span className="row-actions" onClick={e=>e.stopPropagation()}>{a.archivedAt?<button onClick={()=>act(restoreArticles,'Restored.','restore this article',[a.id])}>Restore</button>
       :a.status==='In progress'?<button onClick={()=>onResume(a.id)}>Continue</button>
       :<><button onClick={()=>onOpen(a.id)}>Open</button>{a.status==='Published'&&a.liveUrl&&<a href={a.liveUrl} target="_blank" rel="noreferrer">View live</a>}<button onClick={()=>duplicate(a.id)}>Duplicate</button></>}</span>
     </span>
@@ -86,7 +86,7 @@ export function Library({onOpen,onNew,onResume,onToast}:{onOpen:(id:string)=>voi
 }
 
 type Tab='publish'|'details'|'seo'|'images'|'sources'|'history';
-export function ArticlePage({id,onBack,onResume,onNew,onToast}:{id:string;onBack:()=>void;onResume:(id:string)=>void;onNew:(kw:string)=>void;onToast:(t:string)=>void}){
+export function ArticlePage({id,onBack,onResume,onNew,onToast}:{id:string;onBack:()=>void;onResume:(id:string)=>void;onNew:(kw:string)=>void;onToast:(t:Notice)=>void}){
  const ws=useWorkspace(),voices=voicesFor(ws.name),a=ws.articles.find(x=>x.id===id);
  const [loaded,setLoaded]=useState<boolean|null>(null);
  useEffect(()=>{let live=true;setLoaded(null);loadArticle(id).then(ok=>{if(live)setLoaded(ok);});return()=>{live=false;};},[id]);
@@ -108,17 +108,17 @@ function ArticleSkeleton({onBack}:{onBack:()=>void}){
  </div>;
 }
 
-function DraftPage({a,onBack,onResume,onToast}:{a:Article;onBack:()=>void;onResume:(id:string)=>void;onToast:(t:string)=>void}){
+function DraftPage({a,onBack,onResume,onToast}:{a:Article;onBack:()=>void;onResume:(id:string)=>void;onToast:(t:Notice)=>void}){
  return <div className="article-page">
   <button className="back" onClick={onBack}><ArrowLeft size={16}/>Content library</button>
   <div className="draft-hero"><div><StatusChip a={a}/><h1>{a.title}</h1><Keyword size="md">{a.keyword}</Keyword></div></div>
   <section className="draft-progress"><StepTrack step={a.step||1} working={a.waiting==='us'} size="lg"/></section>
   <div className="draft-next"><Sparkles size={18}/><div><strong>Next: {a.next||'Pick up where you left off'}</strong><p>Everything chosen so far is saved. Pick up exactly where you left off.</p></div><button className="button primary" onClick={()=>onResume(a.id)}>Continue <ArrowRight size={16}/></button></div>
-  <ConfirmButton label="Delete draft" confirm="Click again to delete it for good" onConfirm={async()=>{const ok=await deleteArticles([a.id]);onToast(ok?'Draft deleted.':'Could not delete. Try again.');if(ok)onBack();}}/>
+  <ConfirmButton label="Delete draft" confirm="Click again to delete it for good" onConfirm={async function go(){const ok=await deleteArticles([a.id]);onToast(ok?'Draft deleted.':saveProblem('delete this draft',{retry:go}));if(ok)onBack();}}/>
  </div>;
 }
 
-function FinishedPage({a,voices,onBack,onNew,onToast}:{a:Article;voices:ReturnType<typeof voicesFor>;onBack:()=>void;onNew:(kw:string)=>void;onToast:(t:string)=>void}){
+function FinishedPage({a,voices,onBack,onNew,onToast}:{a:Article;voices:ReturnType<typeof voicesFor>;onBack:()=>void;onNew:(kw:string)=>void;onToast:(t:Notice)=>void}){
  const ws=useWorkspace(),S=useMemo(()=>makeSample(a.keyword,ws.name,ws.domain),[a.keyword,ws.name,ws.domain]);
  const art=useArticle(a.keyword,a.title,a.voice||'team',a.content),post=art.post;
  const [tab,setTab]=useState<Tab>(a.status==='Ready'&&!a.archivedAt?'publish':'details'),[editing,setEditing]=useState(false),[menu,setMenu]=useState(false),[version,setVersion]=useState(0);
@@ -126,7 +126,7 @@ function FinishedPage({a,voices,onBack,onNew,onToast}:{a:Article;voices:ReturnTy
  useEffect(()=>{const close=(e:MouseEvent)=>{if(!menuRef.current?.contains(e.target as Node))setMenu(false);};document.addEventListener('mousedown',close);return()=>document.removeEventListener('mousedown',close);},[]);
  const url=`${ws.domain}/blog/${post.slug}`,words=a.words||countWords(post);
  // Saves the whole article, so later edits, copies, downloads and publishing all use the edited version.
- const saveContent=(next:typeof post,label:string,extra:Partial<Article>={})=>saveArticle({id:a.id,content:next,title:next.title,slug:next.slug,words:countWords(next),...extra},{label}).then(ok=>{onToast(ok?'Changes saved.':'Could not save. Your changes are still on this page; try again.');return ok;});
+ const saveContent=(next:typeof post,label:string,extra:Partial<Article>={})=>saveArticle({id:a.id,content:next,title:next.title,slug:next.slug,words:countWords(next),...extra},{label}).then(ok=>{onToast(ok?'Changes saved.':saveProblem('save your changes',{kept:true,retry:()=>saveContent(next,label,extra)}));return ok;});
  const saveEdits=async()=>{if(!bodyRef.current)return;const next=readEdits(bodyRef.current,post);setEditing(false);setVersion(v=>v+1);await saveContent(next,'Edited');};
  const cancelEdits=()=>{setEditing(false);setVersion(v=>v+1);};
  const doMenu=(f:()=>void)=>()=>{setMenu(false);f();};
@@ -137,22 +137,22 @@ function FinishedPage({a,voices,onBack,onNew,onToast}:{a:Article;voices:ReturnTy
    <div className="ap-actions" ref={menuRef}>
     {editing?<><button className="button ghost" onClick={cancelEdits}>Cancel</button><button className="button primary" onClick={saveEdits}><Check size={16}/>Save changes</button></>
      :!a.archivedAt&&<button className="button secondary" onClick={()=>setEditing(true)}><Pencil size={15}/>Edit</button>}
-    {a.archivedAt?<button className="button primary" onClick={async()=>onToast((await restoreArticles([a.id]))?'Restored.':'Could not restore. Try again.')}><ArchiveRestore size={15}/>Restore</button>
+    {a.archivedAt?<button className="button primary" onClick={async function go(){onToast((await restoreArticles([a.id]))?'Restored.':saveProblem('restore this article',{retry:go}));}}><ArchiveRestore size={15}/>Restore</button>
      :a.status==='Published'?a.liveUrl&&<a className="button secondary" href={a.liveUrl} target="_blank" rel="noreferrer"><ExternalLink size={15}/>View live</a>
      :a.status==='Scheduled'?a.editUrl&&<a className="button secondary" href={a.editUrl} target="_blank" rel="noreferrer"><ExternalLink size={15}/>Open in {platformNames[a.cms||'']||'your blog'}</a>
      :!editing&&<button className="button primary" onClick={()=>setTab('publish')}><Send size={15}/>Publish</button>}
     <button className="icon-button bordered" aria-label="More actions" aria-expanded={menu} onClick={()=>setMenu(m=>!m)}><MoreHorizontal size={18}/></button>
     <AnimatePresence>{menu&&<motion.div className="pop right" initial={{opacity:0,y:-6,scale:.98}} animate={{opacity:1,y:0,scale:1}} exit={{opacity:0,y:-4}} transition={{duration:.18}}>
-     <button onClick={doMenu(async()=>{const c=await duplicateArticle(a.id);onToast(c?'Duplicated. The copy is in the content library.':'Could not duplicate. Try again.');})}><Copy size={15}/><span><strong>Duplicate</strong><small>A copy to rework, not linked to your blog</small></span></button>
+     <button onClick={doMenu(async function go(){const c=await duplicateArticle(a.id);onToast(c?'Duplicated. The copy is in the content library.':saveProblem('duplicate this article',{retry:go}));})}><Copy size={15}/><span><strong>Duplicate</strong><small>A copy to rework, not linked to your blog</small></span></button>
      <button disabled={!art.ready} onClick={doMenu(()=>{downloadZip(post,art.images);onToast('Download started: HTML, Markdown, images, schema and SEO fields.');})}><Download size={15}/><span><strong>Download</strong><small>HTML, Markdown and images</small></span></button>
      <button onClick={doMenu(()=>onNew(a.keyword))}><Sparkles size={15}/><span><strong>New article on a related search</strong></span></button>
-     {(a.status==='Published'||a.status==='Scheduled')&&<button onClick={doMenu(async()=>{const ok=await saveArticle({id:a.id,status:'Ready',scheduledFor:undefined,publishedAt:undefined,liveUrl:undefined});onToast(ok?`Moved back to Ready. The post stays on ${platformNames[a.cms||'']||'your blog'} until you remove it there.`:'Could not save. Try again.');})}><Globe size={15}/><span><strong>Move back to Ready</strong><small>Does not remove it from your blog</small></span></button>}
-     {!a.archivedAt&&<button className="danger" onClick={doMenu(async()=>{const ok=await archiveArticles([a.id]);onToast(ok?'Archived. Find it under Archived in the content library.':'Could not archive. Try again.');if(ok)onBack();})}><Archive size={15}/><span><strong>Archive</strong></span></button>}
+     {(a.status==='Published'||a.status==='Scheduled')&&<button onClick={doMenu(async function go(){const ok=await saveArticle({id:a.id,status:'Ready',scheduledFor:undefined,publishedAt:undefined,liveUrl:undefined});onToast(ok?`Moved back to Ready. The post stays on ${platformNames[a.cms||'']||'your blog'} until you remove it there.`:saveProblem('move it back to Ready',{kept:true,retry:go}));})}><Globe size={15}/><span><strong>Move back to Ready</strong><small>Does not remove it from your blog</small></span></button>}
+     {!a.archivedAt&&<button className="danger" onClick={doMenu(async function go(){const ok=await archiveArticles([a.id]);onToast(ok?'Archived. Find it under Archived in the content library.':saveProblem('archive this article',{retry:go}));if(ok)onBack();})}><Archive size={15}/><span><strong>Archive</strong></span></button>}
     </motion.div>}</AnimatePresence>
    </div>
   </header>
   {a.archivedAt&&<div className="draft-next"><Archive size={18}/><div><strong>This article is archived</strong><p>It is hidden from Home and the content library. Restore it to work on it again.</p></div>
-   <ConfirmButton label="Delete forever" confirm="Click again to delete it for good" onConfirm={async()=>{const ok=await deleteArticles([a.id]);onToast(ok?'Deleted.':'Could not delete. Try again.');if(ok)onBack();}}/></div>}
+   <ConfirmButton label="Delete forever" confirm="Click again to delete it for good" onConfirm={async function go(){const ok=await deleteArticles([a.id]);onToast(ok?'Deleted.':saveProblem('delete this article',{retry:go}));if(ok)onBack();}}/></div>}
   {editing&&<motion.p className="edit-hint" initial={{opacity:0}} animate={{opacity:1}}><Pencil size={14}/>Click anywhere in the article to edit. Save keeps your changes for copying, downloading and publishing.</motion.p>}
   <div className="ap-layout">
    <ArticleBody key={version} bodyRef={bodyRef} post={post} images={art.images} editable={editing} minutes={Math.max(1,Math.round(words/240))}/>

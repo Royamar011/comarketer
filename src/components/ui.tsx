@@ -1,6 +1,6 @@
 import {useEffect,useRef,useState,type ReactNode} from 'react';
 import {AnimatePresence,animate,motion,useReducedMotion} from 'motion/react';
-import {Check,LoaderCircle,Search,Sparkles,TriangleAlert,type LucideIcon} from 'lucide-react';
+import {Check,ChevronDown,CircleAlert,LoaderCircle,RotateCcw,Search,Sparkles,X,type LucideIcon} from 'lucide-react';
 export const ease=[.22,.7,.2,1] as const;
 export const spring={type:'spring',stiffness:420,damping:30} as const;
 
@@ -49,15 +49,47 @@ export function Ring({value,size=44}:{value:number;size?:number}){
  return <svg className="ring" width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden="true"><circle cx={size/2} cy={size/2} r={r} className="ring-bg"/><motion.circle cx={size/2} cy={size/2} r={r} className="ring-fg" strokeDasharray={c} initial={false} animate={{strokeDashoffset:c*(1-Math.min(1,value))}} transition={{duration:.6,ease}}/></svg>;
 }
 
-// Messages that report a problem look different, so a failed save is never mistaken for a saved one.
-const isProblem=(t:string)=>/^(Could not|That did not|Your browser blocked|Not saved|Something went wrong)/.test(t);
-export function Toast({text,onDone}:{text:string|null;onDone:()=>void}){
- useEffect(()=>{if(!text)return;const t=setTimeout(onDone,isProblem(text)?5200:3200);return()=>clearTimeout(t);},[text]);
- const bad=!!text&&isProblem(text);
- return <AnimatePresence>{text&&<motion.div key={text} className={`toast ${bad?'bad':''}`} role={bad?'alert':'status'} initial={{opacity:0,y:18,scale:.96}} animate={{opacity:1,y:0,scale:1}} exit={{opacity:0,y:10,scale:.98}} transition={{type:'spring',stiffness:380,damping:28}}>
-  <motion.span className="toast-icon" initial={{scale:0,rotate:-30}} animate={{scale:1,rotate:0}} transition={{delay:.08,...spring}}>{bad?<TriangleAlert size={16}/>:<Check size={16} strokeWidth={3}/>}</motion.span>{text}
-  {!bad&&<motion.i className="toast-timer" initial={{scaleX:1}} animate={{scaleX:0}} transition={{duration:3.2,ease:'linear'}}/>}
- </motion.div>}</AnimatePresence>;
+// Something went wrong. Says what did not happen and what to do about it, offers a way to fix it,
+// and keeps the technical message out of the way until asked for.
+export type Problem={title:string;fix:string;details?:string;retry?:()=>void;also?:{label:string;run:()=>void}};
+export type Notice=string|Problem;
+
+// Good news: a short toast that leaves on its own.
+export function Toast({notice,onDone}:{notice:Notice|null;onDone:()=>void}){
+ const text=typeof notice==='string'?notice:null;
+ useEffect(()=>{if(!text)return;const t=setTimeout(onDone,3200);return()=>clearTimeout(t);},[text]);
+ return <>
+  <AnimatePresence>{text&&<motion.div key={text} className="toast" role="status" initial={{opacity:0,y:18,scale:.96}} animate={{opacity:1,y:0,scale:1}} exit={{opacity:0,y:10,scale:.98}} transition={{type:'spring',stiffness:380,damping:28}}>
+   <motion.span className="toast-icon" initial={{scale:0,rotate:-30}} animate={{scale:1,rotate:0}} transition={{delay:.08,...spring}}><Check size={16} strokeWidth={3}/></motion.span>{text}
+   <motion.i className="toast-timer" initial={{scaleX:1}} animate={{scaleX:0}} transition={{duration:3.2,ease:'linear'}}/>
+  </motion.div>}</AnimatePresence>
+  <AnimatePresence>{notice&&typeof notice!=='string'&&<ProblemCard key={notice.title} problem={notice} floating onClose={onDone}/>}</AnimatePresence>
+ </>;
+}
+
+// A problem stays until it is dealt with or dismissed. Floating for actions anywhere in the app; inline where it happened.
+export function ProblemCard({problem:p,floating,onClose}:{problem:Problem;floating?:boolean;onClose?:()=>void}){
+ const [open,setOpen]=useState(false);
+ useEffect(()=>{if(!floating||!onClose)return;const k=(e:KeyboardEvent)=>{if(e.key==='Escape')onClose();};window.addEventListener('keydown',k);return()=>window.removeEventListener('keydown',k);},[floating,onClose]);
+ return <motion.section role="alert" aria-live="assertive" className={`problem ${floating?'floating':'inline'}`}
+  initial={{opacity:0,y:floating?24:6,scale:floating?.97:1}} animate={{opacity:1,y:0,scale:1,x:floating?[0,-6,5,-3,0]:0}} exit={{opacity:0,y:12,scale:.98,transition:{duration:.18}}}
+  transition={{type:'spring',stiffness:340,damping:26,x:{delay:.32,duration:.45,ease:'easeInOut'}}}>
+  <span className="problem-icon"><CircleAlert size={18} strokeWidth={2.4}/></span>
+  <div className="problem-body">
+   <strong className="problem-title">{p.title}</strong>
+   <p className="problem-fix">{p.fix}</p>
+   {p.details&&<div className="problem-details">
+    <button type="button" aria-expanded={open} onClick={()=>setOpen(o=>!o)}><ChevronDown size={14} className={open?'turned':''}/>{open?'Hide details':'Show details'}</button>
+    <AnimatePresence initial={false}>{open&&<motion.div initial={{height:0,opacity:0}} animate={{height:'auto',opacity:1}} exit={{height:0,opacity:0}} transition={{duration:.2,ease}}><p className="problem-tech">{p.details}</p></motion.div>}</AnimatePresence>
+   </div>}
+   {(p.retry||p.also||(floating&&onClose))&&<div className="problem-actions">
+    {p.retry&&<button className="button primary compact" onClick={()=>{onClose?.();p.retry!();}}><RotateCcw size={14}/>Try again</button>}
+    {p.also&&<button className="button secondary compact" onClick={()=>{onClose?.();p.also!.run();}}>{p.also.label}</button>}
+    {floating&&onClose&&<button className="button ghost compact" onClick={onClose}>Dismiss</button>}
+   </div>}
+  </div>
+  {onClose&&<button className="icon-button problem-close" aria-label="Dismiss" onClick={onClose}><X size={16}/></button>}
+ </motion.section>;
 }
 
 // A thin bar across the top: a quick sweep on every page change, and a slow glide while data loads.

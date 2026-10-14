@@ -6,7 +6,7 @@
 :root{
  --paper:#FFFCF7;--surface:#fff;--ink:#202018;--ink-2:#3A3A31;--muted:#626158;--faint:#8E8C82;--line:#E4E2DA;--line-2:#EFEDE6;--stone:#F2F0E9;--stone-2:#F8F6F0;
  --blue:#2459E0;--blue-hover:#1844B5;--blue-ink:#1D46B8;--blue-soft:#EEF3FF;--blue-line:#D3DEFA;--tile:#1684FA;--butter:#F3EF9C;--butter-soft:#FBF8DA;--butter-line:#E8E09A;
- --success:#276544;--success-soft:#EAF4EC;--warning:#805900;
+ --success:#276544;--success-soft:#EAF4EC;--danger:#B3342B;--danger-ink:#7A1F18;--danger-soft:#FDF0EC;--danger-line:#F1CFC6;--warning:#805900;
  --display:'DM Sans',sans-serif;--ui:Geist,sans-serif;--mono:'IBM Plex Mono',monospace;
  --r-sm:10px;--r-md:14px;--r-lg:20px;--r-xl:28px;
  --shadow-1:0 1px 2px #20201808;--shadow-2:0 1px 2px #2020180a,0 12px 32px -16px #20201826;--shadow-3:0 2px 6px #2020180d,0 30px 60px -28px #20201833;
@@ -634,7 +634,6 @@ button.finding-src{color:var(--blue-ink)}button.finding-src:hover{text-decoratio
 
 /* Saving, archive, scheduling and SEO save (database-backed content library) */
 .sync{margin-left:10px;font-size:12px;color:var(--faint)}.sync-saving,.sync-loading{color:var(--muted)}.sync-error{color:#B3342B}
-.sync-warn{margin-bottom:12px;padding:10px 14px;border-radius:12px;background:#FDEDE9;border:1px solid #F3C9C0;font-size:14px;color:#8A2B22}
 .s-archived{background:var(--stone-2);color:var(--faint)}
 .lib-search .icon-button{width:24px;height:24px;color:var(--faint)}
 .pub-schedule{display:flex;align-items:flex-end;gap:8px;flex-basis:100%;flex-wrap:wrap;overflow:hidden;padding-top:4px}
@@ -670,7 +669,7 @@ button.finding-src{color:var(--blue-ink)}button.finding-src:hover{text-decoratio
 .sync-ok{display:grid;place-items:center;width:14px;height:14px;border-radius:50%;background:var(--success-soft);color:var(--success)}
 
 /* Toasts */
-.toast{overflow:hidden}.toast.bad{background:#5C1F18}.toast.bad svg{color:#FFB4A6}
+.toast{overflow:hidden}
 .toast-icon{display:grid;place-items:center}
 .toast-timer{position:absolute;left:0;right:0;bottom:0;height:2px;transform-origin:left;background:#9FD6B3;opacity:.5}
 
@@ -691,3 +690,30 @@ button.finding-src{color:var(--blue-ink)}button.finding-src:hover{text-decoratio
 .ready-check{position:relative}
 .burst-anchor{position:relative;width:0;height:0;align-self:center}
 .pub-run header{position:relative}
+
+/* Problems: a card, not a toast. Says what did not happen, what to do, and offers the fix. */
+.problem{position:relative;display:grid;grid-template-columns:auto minmax(0,1fr);gap:14px;padding:18px 48px 18px 18px;border-radius:18px;background:#fff;border:1px solid var(--danger-line);box-shadow:var(--shadow-2);overflow:hidden;text-align:left}
+.problem:after{content:'';position:absolute;inset:0 0 auto 0;height:90px;background:linear-gradient(180deg,var(--danger-soft),#fff0);pointer-events:none}
+.problem>*{position:relative;z-index:1}
+.problem.floating{position:fixed;left:50%;bottom:28px;translate:-50% 0;z-index:110;width:min(480px,calc(100vw - 32px));box-shadow:0 2px 6px #2020180f,0 28px 60px -24px #5c1f1840}
+.problem-icon{display:grid;place-items:center;width:36px;height:36px;border-radius:12px;background:var(--danger);color:#fff;box-shadow:0 6px 14px -6px #B3342B99;animation:problem-ring 1.4s var(--ease) .35s 2}
+@keyframes problem-ring{0%{box-shadow:0 0 0 0 #B3342B33}80%,100%{box-shadow:0 0 0 9px #B3342B00}}
+.problem-body{display:grid;gap:3px;min-width:0;padding-top:6px}
+.problem-title{font-size:16px;line-height:22px;font-weight:650;color:var(--ink);letter-spacing:-.01em}
+.problem-fix{margin-top:2px;font-size:14px;line-height:21px;color:var(--ink-2)}
+.problem-details>button{display:inline-flex;align-items:center;gap:4px;margin-top:6px;padding:2px 0;font-size:13px;color:var(--muted);border-radius:6px}
+.problem-details>button:hover{color:var(--ink)}.problem-details>button svg{transition:transform .2s var(--ease)}.problem-details>button svg.turned{transform:rotate(180deg)}
+.problem-details>div{overflow:hidden}
+.problem-tech{margin-top:8px;padding:10px 12px;border-radius:10px;background:var(--stone-2);border:1px solid var(--line-2);font:12px/18px var(--mono);color:var(--muted);word-break:break-word}
+.problem-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:12px}
+.problem-actions .button.ghost{color:var(--muted)}
+.problem-close{position:absolute;top:12px;right:12px;width:30px;height:30px;color:var(--faint)}.problem-close:hover{color:var(--ink)}
+.problem.inline{box-shadow:var(--shadow-1)}
+.pub-run.has-problem{padding:0;border:0;background:none}.pub-run.has-problem ul{padding:0 2px;font-size:13px}
+.pub-run .problem,.drawer .problem{padding:14px 40px 14px 14px;gap:12px}.pub-run .problem-body,.drawer .problem-body{padding-top:3px}.pub-run .problem-icon,.drawer .problem-icon{width:30px;height:30px;border-radius:10px}
+.pub-run .problem-title,.drawer .problem-title{font-size:15px}
+.lib-problem{margin-bottom:16px}
+.pub-run li.failed{color:var(--danger);font-weight:550}.pub-run li.failed>span{color:var(--danger)}
+.sync-error{color:var(--danger)}
+/* Floating messages sit centred over the page, not over the sidebar */
+@media(min-width:961px){.toast,.problem.floating{left:calc(50% + 120px)}}

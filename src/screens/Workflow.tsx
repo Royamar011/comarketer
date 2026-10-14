@@ -1,9 +1,9 @@
 import {createContext,useContext,useEffect,useMemo,useRef,useState} from 'react';
 import {AnimatePresence,motion} from 'motion/react';
 import {ArrowRight,BookOpen,Columns2,Lightbulb,ListOrdered,Shuffle,Brain,Check,Copy,Download,ExternalLink,FileText,Globe,ImageIcon,Layers,ListChecks,Sparkles,User,UsersRound,X,PenLine} from 'lucide-react';
-import {Burst,Keyword,Nudge,OurPick,Ring,Ticker,TypeStream,WorkList,ease,spring,useSteps} from '../components/ui';
+import {type Notice,Burst,Keyword,Nudge,OurPick,Ring,Ticker,TypeStream,WorkList,ease,spring,useSteps} from '../components/ui';
 import {ArticleBody} from '../components/article';
-import {PublishPanel} from '../components/publish';
+import {PublishPanel,clipboardProblem} from '../components/publish';
 import {buildPost,copyFormatted,countWords,useArticle} from '../article-data';
 import {Tick,stepIcons} from '../components/steps';
 import {Making,type MakeKind} from '../components/making';
@@ -16,7 +16,7 @@ type Ctx={S:Sample;voices:ReturnType<typeof voicesFor>;ws:Workspace;blogTypes:Re
 const StepCtx=createContext<Ctx|null>(null),useCtx=()=>useContext(StepCtx)!;
 
 // With an articleId, the article opens where it was left: same choices, same step, same entry in the library.
-export function Workflow({initialKeyword,articleId,defaultVoice,onExit,onToast}:{initialKeyword:string;articleId?:string;defaultVoice:Voice;onExit:()=>void;onToast:(t:string)=>void}){
+export function Workflow({initialKeyword,articleId,defaultVoice,onExit,onToast}:{initialKeyword:string;articleId?:string;defaultVoice:Voice;onExit:()=>void;onToast:(t:Notice)=>void}){
  const [saved]=useState(()=>articleId?getWorkspace().articles.find(a=>a.id===articleId):undefined),p:Partial<ArticlePlan>=saved?.plan||{};
  const resume=saved&&order.includes(p.phase as Phase)&&p.phase!=='start'?p.phase as Phase:null,kw0=saved?.keyword??initialKeyword;
  const [phase,setPhase]=useState<Phase>(resume||(kw0?'type':'start')),[keyword,setKeyword]=useState(kw0),[voice,setVoice]=useState<Voice>(saved?.voice||defaultVoice);
@@ -226,14 +226,14 @@ function FactCheck({onDone}:{onDone:()=>void}){
  </motion.section>;
 }
 
-function Ready({voice,onToast,onExit}:{voice:Voice;onToast:(t:string)=>void;onExit:()=>void}){
+function Ready({voice,onToast,onExit}:{voice:Voice;onToast:(t:Notice)=>void;onExit:()=>void}){
  const {S,ws,id}=useCtx(),a=ws.articles.find(x=>x.id===id),{post,images,ready}=useArticle(S.k,a?.title||'',voice,a?.content);
  const [tab,setTab]=useState<'publish'|'images'|'quality'>('publish');
  return <>
   <motion.div className="ready-banner" initial={{opacity:0,y:-8}} animate={{opacity:1,y:0}} transition={{duration:.45,ease}}>
    <span className="ready-check"><Burst count={18} radius={58}/><svg viewBox="0 0 24 24"><motion.path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" initial={{pathLength:0}} animate={{pathLength:1}} transition={{duration:.55,delay:.2}}/></svg></span>
    <div><strong>Ready to publish</strong><p><Ticker value={countWords(post)}/> words · <Ticker value={post.images.length}/> images with alt text · <Ticker value={post.faq.length}/> FAQs · <Ticker value={S.research.length}/> sources cited · every fact checked</p></div>
-   <button className="button primary" disabled={!ready} onClick={async()=>{try{await copyFormatted(post,images);onToast('Copied with formatting and images. Paste into Google Docs, WordPress or Notion.');}catch{onToast('Your browser blocked the clipboard. Use Download instead.');}}}><Copy size={16}/>Copy article</button>
+   <button className="button primary" disabled={!ready} onClick={async()=>{try{await copyFormatted(post,images);onToast('Copied with formatting and images. Paste into Google Docs, WordPress or Notion.');}catch{onToast(clipboardProblem);}}}><Copy size={16}/>Copy article</button>
   </motion.div>
   <div className="ready-layout">
    <ArticleBody post={post} images={images}/>

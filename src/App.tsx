@@ -2,7 +2,7 @@ import {useEffect,useRef,useState} from 'react';
 import {AnimatePresence,motion,MotionConfig} from 'motion/react';
 import {Home as HomeIcon,LibraryBig,Building2,PenLine,Settings as SettingsIcon,Plus,Menu,Check} from 'lucide-react';
 import {Logo} from './components/brand';
-import {RouteBar,Toast,ease,spring} from './components/ui';
+import {RouteBar,Toast,ease,spring,type Notice} from './components/ui';
 import {Onboarding,type ObStart} from './screens/Onboarding';
 import {useWorkspace} from './workspace';
 import {Workflow} from './screens/Workflow';
@@ -29,7 +29,7 @@ function WsLogo({logo,name}:{logo:string;name:string}){
 
 export function App(){
  const ws=useWorkspace();
- const [obStart,setObStart]=useState<ObStart>('welcome'),[view,setView]=useState<View>(()=>(location.hash.slice(1).split('/')[0] as View)||'onboarding'),[voice,setVoice]=useState<Voice>('team'),[keyword,setKeyword]=useState(''),[toast,setToast]=useState<string|null>(null),[menu,setMenu]=useState(false),[firstVisit,setFirstVisit]=useState(false),[runKey,setRunKey]=useState(0),[articleId,setArticleId]=useState(()=>decodeURIComponent(location.hash.split('/')[1]||'')),[resumeId,setResumeId]=useState<string|undefined>();
+ const [obStart,setObStart]=useState<ObStart>('welcome'),[view,setView]=useState<View>(()=>(location.hash.slice(1).split('/')[0] as View)||'onboarding'),[voice,setVoice]=useState<Voice>('team'),[keyword,setKeyword]=useState(''),[toast,setToast]=useState<Notice|null>(null),[menu,setMenu]=useState(false),[firstVisit,setFirstVisit]=useState(false),[runKey,setRunKey]=useState(0),[articleId,setArticleId]=useState(()=>decodeURIComponent(location.hash.split('/')[1]||'')),[resumeId,setResumeId]=useState<string|undefined>();
  // The open article is in the address (#article/<id>), so a reload or a shared link opens the same one.
  useEffect(()=>{const sync=()=>{const [v,id]=location.hash.slice(1).split('/') as [View,string?];if(['onboarding','home','new','library','article','context','styles','settings'].includes(v))setView(v);if(v==='article'&&id)setArticleId(decodeURIComponent(id));};window.addEventListener('hashchange',sync);return()=>window.removeEventListener('hashchange',sync);},[]);
  const from=useRef(view),dir=place[view]>=place[from.current]?1:-1;
@@ -52,7 +52,7 @@ export function App(){
     <button className={`nav-item ${view==='settings'?'active':''}`} aria-current={view==='settings'?'page':undefined} onClick={()=>go('settings')}>{view==='settings'&&<motion.span layoutId="nav-pill" className="nav-pill" transition={spring}/>}<SettingsIcon size={17}/><span>Settings</span></button>
     <span className={`sync sync-${ws.sync}`} role="status"><AnimatePresence mode="wait" initial={false}><motion.span key={ws.sync} className="sync-line" initial={{opacity:0,y:5}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-5}} transition={{duration:.18}}>
      {ws.sync==='saved'?<motion.span className="sync-ok" initial={{scale:0}} animate={{scale:1}} transition={spring}><Check size={10} strokeWidth={3.5}/></motion.span>:<i className="sync-dot"/>}
-     {ws.sync==='error'?'Not saved. Is the dev server running?':ws.sync==='saving'?'Saving…':ws.sync==='loading'?'Loading…':'All changes saved'}
+     {ws.sync==='error'?'Not saved':ws.sync==='saving'?'Saving…':ws.sync==='loading'?'Loading…':'All changes saved'}
     </motion.span></AnimatePresence></span>
     <span className="preview-chip">Design preview</span>
    </div>
@@ -73,6 +73,6 @@ export function App(){
     </motion.div></AnimatePresence>
    </main>
   </div>
-  <Toast text={toast} onDone={()=>setToast(null)}/>
+  <Toast notice={toast} onDone={()=>setToast(null)}/>
  </div></MotionConfig>;
 }

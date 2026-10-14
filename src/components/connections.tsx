@@ -1,8 +1,8 @@
 import {useEffect,useState} from 'react';
 import {AnimatePresence,motion} from 'motion/react';
-import {Check,Download,LoaderCircle,Plug,TriangleAlert,X} from 'lucide-react';
-import {ease} from './ui';
-import {platformNames,useConnections,type Conn} from './publish';
+import {Check,Download,LoaderCircle,Plug,X} from 'lucide-react';
+import {ProblemCard,ease} from './ui';
+import {blogProblem,platformNames,useConnections,type Conn} from './publish';
 import {useWorkspace} from '../workspace';
 
 type Field={id:string;label:string;placeholder:string;secret?:boolean};
@@ -32,7 +32,7 @@ function WebflowMap({domain,onDone}:{domain:string;onDone:()=>void}){
  const pick=(c:any,all=cols)=>{setCol(c.id);const m:Record<string,string>={};for(const o of ours){const f=c.fields.find((f:any)=>o.types.includes(f.type)&&o.hint.test(f.name+' '+f.slug));if(f)m[o.id]=f.slug;}setMap(m);void all;};
  const c=cols?.find(x=>x.id===col);
  const save=async()=>{await fetch('/api/connections/settings',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({domain,platform:'webflow',settings:{collectionId:col,collectionSlug:c.slug,map}})});onDone();};
- if(err)return <p className="pub-error"><TriangleAlert size={15}/>{err}</p>;
+ if(err)return <ProblemCard problem={blogProblem('Webflow',err,{connecting:true})}/>;
  if(!cols)return <p className="muted"><LoaderCircle className="spin" size={14}/> Reading your collections…</p>;
  return <div className="wf-map">
   <label className="field">Blog collection<select value={col} onChange={e=>pick(cols.find(x=>x.id===e.target.value))}>{cols.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
@@ -60,7 +60,7 @@ function Connect({platform,existing,onClose,onSaved}:{platform:string;existing?:
    </>:<>
     <ol className="how">{cfg.how.map(h=><li key={h}>{h}</li>)}</ol>
     {cfg.fields.map(f=><label key={f.id} className="field">{f.label}<input type={f.secret?'password':'text'} autoComplete="off" placeholder={f.placeholder} value={vals[f.id]||''} onChange={e=>setVals({...vals,[f.id]:e.target.value})}/></label>)}
-    {err&&<p className="pub-error"><TriangleAlert size={15}/>{err}</p>}
+    {err&&<ProblemCard problem={blogProblem(platformNames[platform],err,{connecting:true})}/>}
     <button className="button primary" disabled={busy||cfg.fields.some(f=>!vals[f.id]?.trim())} onClick={submit}>{busy?<><LoaderCircle className="spin" size={15}/>Checking…</>:'Test and connect'}</button>
     <p className="muted small">Keys are kept on the Comarketer server for this company, never in the browser.</p>
    </>}

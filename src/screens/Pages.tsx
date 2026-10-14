@@ -2,7 +2,7 @@ import {useEffect,useState} from 'react';
 import {motion} from 'motion/react';
 import type React from 'react';
 import {ArrowRight,Check,CheckCircle2,ExternalLink,FileText,ImageIcon,Layers,LoaderCircle,Pencil,RefreshCw,Globe,Search} from 'lucide-react';
-import {Tile,ease} from '../components/ui';
+import {Tile,ease,type Notice} from '../components/ui';
 import {StepTrack} from '../components/steps';
 import {BriefView} from '../components/brief';
 import {Connections} from '../components/connections';
@@ -82,7 +82,7 @@ export function Styles({voice,setVoice}:{voice:Voice;setVoice:(v:Voice)=>void}){
  </motion.section>)}</div>;
 }
 
-export function Settings({onToast,onResearch}:{onToast:(t:string)=>void;onResearch:()=>void}){
+export function Settings({onToast,onResearch}:{onToast:(t:Notice)=>void;onResearch:()=>void}){
  const [img,setImg]=useState<'openai'|'gemini'>('openai'),ws=useWorkspace();
  return <div className="settings">
   <section className="setting"><Tile icon={Globe} size="sm"/><div><h3>Website</h3><p className="muted">{ws.domain} · your brief is built from this site.</p></div><button className="button secondary compact" onClick={onResearch}>Research a website</button></section>
