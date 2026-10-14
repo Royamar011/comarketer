@@ -40,9 +40,10 @@ export function Home({onNew,onOpen,onResume,onLibrary}:{onNew:(keyword:string)=>
 }
 
 function BlogCard({a,i,onOpen,onContinue}:{a:Article;i:number;onOpen:(id:string)=>void;onContinue:(id:string)=>void}){
+ // Cards lift a little under the pointer and press in when clicked.
  const draft=a.status==='In progress',yours=a.waiting==='you';
  const line=draft?(yours?`Next: ${a.next?.toLowerCase()}`:a.next):a.status==='Ready'?'Ready to publish':a.status==='Scheduled'?`Goes live ${whenExact(a.scheduledFor)}`:`Published ${when(a.publishedAt)}`;
- return <motion.article className={`blog-card ${draft?'is-draft':''} ${yours?'is-yours':''}`} initial={{opacity:0,y:18}} animate={{opacity:1,y:0}} transition={{delay:.12+i*.06,duration:.5,ease}} onClick={()=>onOpen(a.id)}>
+ return <motion.article className={`blog-card ${draft?'is-draft':''} ${yours?'is-yours':''}`} initial={{opacity:0,y:18}} animate={{opacity:1,y:0}} transition={{delay:.12+i*.06,duration:.5,ease}} whileHover={{y:-4,transition:{type:'spring',stiffness:400,damping:24}}} whileTap={{scale:.985}} onClick={()=>onOpen(a.id)}>
   <div className={`cover ${draft?'draft':`t${i%4}`}`}>
    {draft?<StepTrack step={a.step||1} working={!yours} size="sm"/>:<span className="cover-art" aria-hidden="true"><i/><i/><i/></span>}
    {yours&&<span className="cover-flag">Action needed</span>}

@@ -1,7 +1,7 @@
 import {createContext,useContext,useEffect,useMemo,useRef,useState} from 'react';
 import {AnimatePresence,motion} from 'motion/react';
 import {ArrowRight,BookOpen,Columns2,Lightbulb,ListOrdered,Shuffle,Brain,Check,Copy,Download,ExternalLink,FileText,Globe,ImageIcon,Layers,ListChecks,Sparkles,User,UsersRound,X,PenLine} from 'lucide-react';
-import {Keyword,Nudge,OurPick,Ring,Ticker,TypeStream,WorkList,ease,spring,useSteps} from '../components/ui';
+import {Burst,Keyword,Nudge,OurPick,Ring,Ticker,TypeStream,WorkList,ease,spring,useSteps} from '../components/ui';
 import {ArticleBody} from '../components/article';
 import {PublishPanel} from '../components/publish';
 import {buildPost,copyFormatted,countWords,useArticle} from '../article-data';
@@ -231,7 +231,7 @@ function Ready({voice,onToast,onExit}:{voice:Voice;onToast:(t:string)=>void;onEx
  const [tab,setTab]=useState<'publish'|'images'|'quality'>('publish');
  return <>
   <motion.div className="ready-banner" initial={{opacity:0,y:-8}} animate={{opacity:1,y:0}} transition={{duration:.45,ease}}>
-   <span className="ready-check"><svg viewBox="0 0 24 24"><motion.path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" initial={{pathLength:0}} animate={{pathLength:1}} transition={{duration:.55,delay:.2}}/></svg></span>
+   <span className="ready-check"><Burst count={18} radius={58}/><svg viewBox="0 0 24 24"><motion.path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" initial={{pathLength:0}} animate={{pathLength:1}} transition={{duration:.55,delay:.2}}/></svg></span>
    <div><strong>Ready to publish</strong><p><Ticker value={countWords(post)}/> words · <Ticker value={post.images.length}/> images with alt text · <Ticker value={post.faq.length}/> FAQs · <Ticker value={S.research.length}/> sources cited · every fact checked</p></div>
    <button className="button primary" disabled={!ready} onClick={async()=>{try{await copyFormatted(post,images);onToast('Copied with formatting and images. Paste into Google Docs, WordPress or Notion.');}catch{onToast('Your browser blocked the clipboard. Use Download instead.');}}}><Copy size={16}/>Copy article</button>
   </motion.div>

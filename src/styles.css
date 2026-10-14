@@ -642,3 +642,52 @@ button.finding-src{color:var(--blue-ink)}button.finding-src:hover{text-decoratio
 .seo-save{display:flex;justify-content:flex-end;gap:8px;margin:-4px 0 16px}
 .field small.over{color:#8A6D10}
 .facts dd a{color:var(--blue);word-break:break-all}
+
+/* Motion: navigation, loading and small moments */
+/* Menu highlight glides between items instead of jumping */
+.nav-item{position:relative;isolation:isolate}.nav-item.active{background:none;box-shadow:none}
+.nav-item>svg,.nav-item>span:not(.nav-pill){position:relative;z-index:1}
+.nav-pill{position:absolute;inset:0;z-index:0;border-radius:10px;background:#fff;box-shadow:var(--shadow-1),0 0 0 1px var(--line)}
+.nav-item>svg{transition:color .2s,transform .3s var(--ease)}.nav-item:hover>svg{transform:translateX(1px) rotate(-6deg)}
+
+/* Buttons press in */
+.button,.icon-button,.nav-item,.seg button,.lib-tabs button{transition-property:background-color,border-color,color,box-shadow,transform}
+:is(.button,.icon-button,.nav-item,.seg button):active:not(:disabled){transform:scale(.97);transition-duration:.08s}
+.button.primary:hover:not(:disabled){box-shadow:0 1px 0 #ffffff33 inset,0 10px 22px -10px #2459E0cc}
+
+/* Progress bar along the top of the page */
+.route-bar{position:fixed;top:0;left:240px;right:0;z-index:40;height:3px;overflow:hidden;pointer-events:none}
+.route-bar i{position:absolute;inset:0;transform-origin:left;background:linear-gradient(90deg,var(--blue),#6E96F5)}
+.route-busy{width:35%;inset:0 auto 0 0!important;animation:route-glide 1.3s var(--ease) infinite}
+@keyframes route-glide{from{transform:translateX(-100%)}to{transform:translateX(300%)}}
+@media(max-width:960px){.route-bar{left:0}}
+
+/* Save indicator */
+.sync-line{display:inline-flex;align-items:center;gap:7px}
+.sync-dot{width:7px;height:7px;border-radius:50%;background:currentColor;animation:sync-pulse 1.1s ease-in-out infinite}
+.sync-error .sync-dot{animation:none}
+@keyframes sync-pulse{50%{opacity:.25;transform:scale(.7)}}
+.sync-ok{display:grid;place-items:center;width:14px;height:14px;border-radius:50%;background:var(--success-soft);color:var(--success)}
+
+/* Toasts */
+.toast{overflow:hidden}.toast.bad{background:#5C1F18}.toast.bad svg{color:#FFB4A6}
+.toast-icon{display:grid;place-items:center}
+.toast-timer{position:absolute;left:0;right:0;bottom:0;height:2px;transform-origin:left;background:#9FD6B3;opacity:.5}
+
+/* Placeholders while things load */
+.skel{display:block;flex-shrink:0;background:linear-gradient(90deg,var(--stone) 25%,var(--stone-2) 50%,var(--stone) 75%);background-size:200% 100%;animation:shimmer 1.4s linear infinite}
+.skel-row{cursor:default;animation:skel-in .4s var(--ease) both}.skel-row:hover{background:none}
+@keyframes skel-in{from{opacity:0;transform:translateY(6px)}}
+.skel-article{display:grid;gap:14px;align-content:start}.skel-figure{margin:10px 0}
+.skel-side{display:grid;gap:14px;padding:16px}
+.skel-list{display:grid;gap:18px}.skel-list>div{display:grid;gap:7px}
+
+/* Empty state icon */
+.lib-empty-icon{display:grid;place-items:center;width:48px;height:48px;border-radius:14px;background:var(--blue-soft);color:var(--blue);margin-bottom:4px}
+
+/* Celebration burst */
+.burst{position:absolute;left:50%;top:50%;width:0;height:0;pointer-events:none;z-index:2}
+.burst i{position:absolute;left:0;top:0;margin:-3px 0 0 -3px;border-radius:50%}
+.ready-check{position:relative}
+.burst-anchor{position:relative;width:0;height:0;align-self:center}
+.pub-run header{position:relative}

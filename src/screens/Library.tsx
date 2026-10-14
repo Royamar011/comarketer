@@ -1,7 +1,7 @@
 import {useEffect,useMemo,useRef,useState} from 'react';
 import {AnimatePresence,motion} from 'motion/react';
 import {ArrowLeft,ArrowRight,Archive,ArchiveRestore,Check,Copy,Download,ExternalLink,LoaderCircle,MoreHorizontal,Pencil,Search,Send,ShieldCheck,Sparkles,Trash2,Globe,BookOpen,X} from 'lucide-react';
-import {Keyword,ease,spring} from '../components/ui';
+import {Keyword,Skel,Ticker,ease,spring} from '../components/ui';
 import {ArticleBody,readEdits} from '../components/article';
 import {StepTrack} from '../components/steps';
 import {voicesFor,workflowSteps,type Article,type Status} from '../data';
@@ -12,10 +12,12 @@ import {archiveArticles,deleteArticles,duplicateArticle,loadArticle,restoreArtic
 type Filter='All'|Status|'Archived';
 const filters:Filter[]=['All','In progress','Ready','Scheduled','Published','Archived'];
 
+// Pops gently when the status changes, so a move from Ready to Published is noticed.
 export function StatusChip({a}:{a:Article}){
- if(a.archivedAt)return <span className="status s-archived"><i/>Archived</span>;
- if(a.status==='In progress')return <span className={`status s-progress ${a.waiting==='us'?'working':''}`}>{a.waiting==='us'?<LoaderCircle className="spin" size={12}/>:<i/>}{a.waiting==='us'?'In progress':'Action needed'}</span>;
- return <span className={`status s-${a.status.toLowerCase()}`}><i/>{a.status==='Ready'?'Ready to publish':a.status}</span>;
+ const key=a.archivedAt?'archived':a.status==='In progress'?`p-${a.waiting}`:a.status,pop={initial:{scale:.85,opacity:0},animate:{scale:1,opacity:1},transition:spring};
+ if(a.archivedAt)return <motion.span key={key} {...pop} className="status s-archived"><i/>Archived</motion.span>;
+ if(a.status==='In progress')return <motion.span key={key} {...pop} className={`status s-progress ${a.waiting==='us'?'working':''}`}>{a.waiting==='us'?<LoaderCircle className="spin" size={12}/>:<i/>}{a.waiting==='us'?'In progress':'Action needed'}</motion.span>;
+ return <motion.span key={key} {...pop} className={`status s-${a.status.toLowerCase()}`}><i/>{a.status==='Ready'?'Ready to publish':a.status}</motion.span>;
 }
 export function StepMeter({a}:{a:Article}){
  return <span className="step-meter" aria-label={`Step ${a.step} of 4: ${workflowSteps[(a.step||1)-1]}`}>{workflowSteps.map((s,i)=><i key={s} className={i<(a.step||0)-1?'done':i===(a.step||0)-1?'now':''}/>)}<b>{workflowSteps[(a.step||1)-1]}</b></span>;
@@ -47,7 +49,7 @@ export function Library({onOpen,onNew,onResume,onToast}:{onOpen:(id:string)=>voi
  return <div className="library">
   {ws.sync==='error'&&<p className="sync-warn">Changes could not be saved to the database. Check the dev server is running. They are kept on this page until it reconnects.</p>}
   <div className="lib-bar">
-   <div className="lib-tabs" role="tablist">{filters.filter(f=>f!=='Archived'||archived.length||filter==='Archived').map(f=><button key={f} role="tab" aria-selected={filter===f} className={filter===f?'on':''} onClick={()=>{setFilter(f);setPicked([]);}}>{f}<b>{count(f)}</b>{filter===f&&<motion.i layoutId="lib-tab" className="lib-tab-line" transition={spring}/>}</button>)}</div>
+   <div className="lib-tabs" role="tablist">{filters.filter(f=>f!=='Archived'||archived.length||filter==='Archived').map(f=><button key={f} role="tab" aria-selected={filter===f} className={filter===f?'on':''} onClick={()=>{setFilter(f);setPicked([]);}}>{f}<b><Ticker value={count(f)}/></b>{filter===f&&<motion.i layoutId="lib-tab" className="lib-tab-line" transition={spring}/>}</button>)}</div>
    <label className="lib-search"><Search size={16}/><input aria-label="Search content" placeholder="Search titles and keywords" value={q} onChange={e=>setQ(e.target.value)}/>{q&&<button className="icon-button" aria-label="Clear search" onClick={()=>setQ('')}><X size={14}/></button>}</label>
   </div>
   <AnimatePresence>{shown.length>0&&<motion.div className="bulk" initial={{opacity:0,y:-6}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-6}} transition={{duration:.2}}>
@@ -58,6 +60,7 @@ export function Library({onOpen,onNew,onResume,onToast}:{onOpen:(id:string)=>voi
   </motion.div>}</AnimatePresence>
   <div className="lib-table" role="table" aria-label="Content">
    <div className="lib-head" role="row"><span role="columnheader"><input type="checkbox" aria-label="Select all" checked={shown.length===list.length&&list.length>0} onChange={e=>setPicked(e.target.checked?list.map(a=>a.id):[])}/></span><span role="columnheader">Title</span><span role="columnheader">Status</span><span role="columnheader">Author</span><span role="columnheader">Words</span><span role="columnheader">Quality</span><span role="columnheader">Date</span><span/></div>
+   {ws.sync==='loading'&&!ws.articles.length&&[0,1,2,3].map(i=><div key={i} className="lib-row skel-row" aria-hidden="true" style={{animationDelay:`${i*.08}s`}}><span><Skel w={17} h={17} r={5}/></span><span className="lib-title"><Skel w={`${70-i*9}%`} h={16}/><Skel w={110} h={22} r={8}/></span><span><Skel w={120} h={24} r={999}/></span><span><Skel w={80}/></span><span><Skel w={44}/></span><span><Skel w={32} h={22} r={8}/></span><span><Skel w={110}/></span><span/></div>)}
    <AnimatePresence initial={false} mode="popLayout">{list.map((a,i)=><motion.div key={a.id} layout role="row" className={`lib-row ${picked.includes(a.id)?'picked':''}`} initial={{opacity:0,y:6}} animate={{opacity:1,y:0,transition:{delay:Math.min(i,12)*.03,duration:.3,ease}}} exit={{opacity:0,scale:.98,transition:{duration:.15}}} transition={{layout:{duration:.3,ease}}} onClick={()=>onOpen(a.id)}>
     <span role="cell" onClick={e=>e.stopPropagation()}><input type="checkbox" aria-label={`Select ${a.title}`} checked={picked.includes(a.id)} onChange={()=>toggle(a.id)}/></span>
     <span role="cell" className="lib-title"><strong>{a.title}</strong><Keyword size="sm" muted>{a.keyword}</Keyword>
@@ -72,13 +75,12 @@ export function Library({onOpen,onNew,onResume,onToast}:{onOpen:(id:string)=>voi
     <span role="cell" className="muted date">{dateOf(a)}</span>
     <span role="cell" className="chev"><ArrowRight size={16}/></span>
    </motion.div>)}</AnimatePresence>
-   {!list.length&&<div className="lib-empty"><BookOpen size={22}/>
-    {ws.sync==='loading'&&!ws.articles.length?<><strong>Loading your articles</strong><p>One moment.</p></>
-     :q?<><strong>No matches</strong><p>Try another word from the title or keyword.</p><button className="button secondary" onClick={()=>setQ('')}>Clear search</button></>
+   {!list.length&&!(ws.sync==='loading'&&!ws.articles.length)&&<motion.div className="lib-empty" initial={{opacity:0,y:8}} animate={{opacity:1,y:0}} transition={{duration:.35,ease}}><motion.span className="lib-empty-icon" initial={{scale:.6,rotate:-12}} animate={{scale:1,rotate:0}} transition={{delay:.1,...spring}}><BookOpen size={22}/></motion.span>
+    {q?<><strong>No matches</strong><p>Try another word from the title or keyword.</p><button className="button secondary" onClick={()=>setQ('')}>Clear search</button></>
      :filter==='Archived'?<><strong>Nothing archived</strong><p>Archived articles are kept here until you restore or delete them.</p></>
      :filter!=='All'?<><strong>No {filter.toLowerCase()} articles</strong><p>They show up here as soon as one is.</p></>
      :<><strong>Nothing here yet</strong><p>Articles show up here as soon as you start them.</p><button className="button primary" onClick={onNew}>Start an article <ArrowRight size={16}/></button></>}
-   </div>}
+   </motion.div>}
   </div>
  </div>;
 }
@@ -88,11 +90,22 @@ export function ArticlePage({id,onBack,onResume,onNew,onToast}:{id:string;onBack
  const ws=useWorkspace(),voices=voicesFor(ws.name),a=ws.articles.find(x=>x.id===id);
  const [loaded,setLoaded]=useState<boolean|null>(null);
  useEffect(()=>{let live=true;setLoaded(null);loadArticle(id).then(ok=>{if(live)setLoaded(ok);});return()=>{live=false;};},[id]);
- if(!a)return <div className="article-page"><button className="back" onClick={onBack}><ArrowLeft size={16}/>Content library</button><p className="muted">{loaded===null?'Loading…':'This article is no longer here.'}</p></div>;
+ if(!a)return loaded===null?<ArticleSkeleton onBack={onBack}/>:<div className="article-page"><button className="back" onClick={onBack}><ArrowLeft size={16}/>Content library</button><p className="muted">This article is no longer here.</p></div>;
  if(a.status==='In progress'&&!a.archivedAt)return <DraftPage a={a} onBack={onBack} onResume={onResume} onToast={onToast}/>;
  // Content arrives with the full article. Until then, show nothing rather than a stand-in that then changes.
- if(loaded===null&&!a.content)return <div className="article-page"><button className="back" onClick={onBack}><ArrowLeft size={16}/>Content library</button><p className="muted"><LoaderCircle className="spin" size={14}/> Opening the article…</p></div>;
+ if(loaded===null&&!a.content)return <ArticleSkeleton onBack={onBack}/>;
  return <FinishedPage key={a.id} a={a} voices={voices} onBack={onBack} onNew={onNew} onToast={onToast}/>;
+}
+
+function ArticleSkeleton({onBack}:{onBack:()=>void}){
+ return <div className="article-page" aria-busy="true" aria-label="Opening the article">
+  <button className="back" onClick={onBack}><ArrowLeft size={16}/>Content library</button>
+  <header className="ap-head"><div className="ap-title"><Skel w={130} h={26} r={999}/><Skel w={110}/></div><div className="ap-actions"><Skel w={92} h={44} r={999}/><Skel w={110} h={44} r={999}/></div></header>
+  <div className="ap-layout">
+   <div className="paper article skel-article"><Skel w={180} h={12}/><Skel w="88%" h={34} r={10}/><Skel w="62%" h={34} r={10}/><Skel w="100%" h={260} r={16} className="skel-figure"/>{[96,100,91,72,100,84].map((w,i)=><Skel key={i} w={`${w}%`}/>)}</div>
+   <aside className="ap-side skel-side"><Skel w="100%" h={36} r={10}/>{[80,64,90,56].map((w,i)=><Skel key={i} w={`${w}%`}/>)}</aside>
+  </div>
+ </div>;
 }
 
 function DraftPage({a,onBack,onResume,onToast}:{a:Article;onBack:()=>void;onResume:(id:string)=>void;onToast:(t:string)=>void}){
@@ -186,7 +199,7 @@ function SeoTab({post,domain,checks,onSave}:{post:ReturnType<typeof useArticle>[
 const isoLike=/^\d{4}-\d\d-\d\dT/;
 function History({id,version}:{id:string;version:string}){
  const events=useArticleEvents(id,version);
- if(!events)return <p className="muted"><LoaderCircle className="spin" size={14}/> Loading…</p>;
+ if(!events)return <div className="skel-list" aria-busy="true">{[0,1,2].map(i=><div key={i}><Skel w={`${60-i*12}%`} h={15}/><Skel w={`${40-i*6}%`} h={12}/></div>)}</div>;
  if(!events.length)return <p className="muted">Nothing recorded yet. Changes show up here as they happen.</p>;
- return <ol className="timeline">{events.map((e,i)=><li key={i}><span className={i===0?'now':''}/><strong>{e.label}</strong><small>{isoLike.test(e.detail)?whenExact(e.detail):e.detail}{e.detail?' · ':''}{when(e.at)}</small></li>)}</ol>;
+ return <ol className="timeline">{events.map((e,i)=><motion.li key={`${e.at}-${i}`} initial={{opacity:0,x:-8}} animate={{opacity:1,x:0}} transition={{delay:Math.min(i,8)*.05,duration:.3,ease}}><span className={i===0?'now':''}/><strong>{e.label}</strong><small>{isoLike.test(e.detail)?whenExact(e.detail):e.detail}{e.detail?' · ':''}{when(e.at)}</small></motion.li>)}</ol>;
 }

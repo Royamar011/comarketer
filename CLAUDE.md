@@ -26,6 +26,7 @@ The `Article` type is in `src/data.ts`. The content library is `src/screens/Libr
 - The user sees `context.md`; writing calls use `context-full.md`. Research is stored in full so writing never relies on memory.
 - Publishing goes in as a draft by default. Keys stay on the server, never in the browser.
 - Design tokens are in `src/styles.css` (ivory, ink, cobalt blue, butter). Readable type sizes, calm motion, light and dark care.
+- Shared motion pieces are in `src/components/ui.tsx`: `RouteBar` (top progress bar), `Skel` (loading placeholders), `Burst` (small celebration), `Toast` (problems shown in red). Page transitions follow menu order (`place` in `src/App.tsx`). Keep `MotionConfig reducedMotion="user"` and the reduced-motion CSS working.
 
 ## Docs
 `PLAN.md` (product and UX), `DATABASE.md` (database choice, tables, API), `CONTENT_ENGINE.md` (prompt layers), `CMS_INTEGRATIONS.md` (publishing), `prompts/README.md` (all writing instructions).

@@ -1,6 +1,6 @@
 import {useEffect,useRef,useState,type ReactNode} from 'react';
 import {AnimatePresence,animate,motion,useReducedMotion} from 'motion/react';
-import {Check,LoaderCircle,Search,Sparkles,type LucideIcon} from 'lucide-react';
+import {Check,LoaderCircle,Search,Sparkles,TriangleAlert,type LucideIcon} from 'lucide-react';
 export const ease=[.22,.7,.2,1] as const;
 export const spring={type:'spring',stiffness:420,damping:30} as const;
 
@@ -49,7 +49,35 @@ export function Ring({value,size=44}:{value:number;size?:number}){
  return <svg className="ring" width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden="true"><circle cx={size/2} cy={size/2} r={r} className="ring-bg"/><motion.circle cx={size/2} cy={size/2} r={r} className="ring-fg" strokeDasharray={c} initial={false} animate={{strokeDashoffset:c*(1-Math.min(1,value))}} transition={{duration:.6,ease}}/></svg>;
 }
 
+// Messages that report a problem look different, so a failed save is never mistaken for a saved one.
+const isProblem=(t:string)=>/^(Could not|That did not|Your browser blocked|Not saved|Something went wrong)/.test(t);
 export function Toast({text,onDone}:{text:string|null;onDone:()=>void}){
- useEffect(()=>{if(!text)return;const t=setTimeout(onDone,3200);return()=>clearTimeout(t);},[text]);
- return <AnimatePresence>{text&&<motion.div className="toast" role="status" initial={{opacity:0,y:14,scale:.98}} animate={{opacity:1,y:0,scale:1}} exit={{opacity:0,y:8}} transition={{duration:.3,ease}}><Check size={16}/>{text}</motion.div>}</AnimatePresence>;
+ useEffect(()=>{if(!text)return;const t=setTimeout(onDone,isProblem(text)?5200:3200);return()=>clearTimeout(t);},[text]);
+ const bad=!!text&&isProblem(text);
+ return <AnimatePresence>{text&&<motion.div key={text} className={`toast ${bad?'bad':''}`} role={bad?'alert':'status'} initial={{opacity:0,y:18,scale:.96}} animate={{opacity:1,y:0,scale:1}} exit={{opacity:0,y:10,scale:.98}} transition={{type:'spring',stiffness:380,damping:28}}>
+  <motion.span className="toast-icon" initial={{scale:0,rotate:-30}} animate={{scale:1,rotate:0}} transition={{delay:.08,...spring}}>{bad?<TriangleAlert size={16}/>:<Check size={16} strokeWidth={3}/>}</motion.span>{text}
+  {!bad&&<motion.i className="toast-timer" initial={{scaleX:1}} animate={{scaleX:0}} transition={{duration:3.2,ease:'linear'}}/>}
+ </motion.div>}</AnimatePresence>;
+}
+
+// A thin bar across the top: a quick sweep on every page change, and a slow glide while data loads.
+export function RouteBar({routeKey,busy}:{routeKey:string;busy:boolean}){
+ return <div className="route-bar" aria-hidden="true">
+  {busy&&<i className="route-busy"/>}
+  <motion.i key={routeKey} className="route-sweep" initial={{scaleX:0,opacity:1}} animate={{scaleX:1,opacity:0}} transition={{scaleX:{duration:.5,ease},opacity:{delay:.42,duration:.3}}}/>
+ </div>;
+}
+
+// A small burst of brand-coloured dots for moments worth marking: a draft finished, a post sent.
+const burstColors=['var(--blue)','var(--butter)','#1F7A4D','var(--blue-line)','#F2A65A'];
+export function Burst({count=14,radius=46}:{count?:number;radius?:number}){
+ const still=useReducedMotion();
+ const dots=useRef(Array.from({length:count},(_,i)=>{const a=(i/count)*Math.PI*2+Math.random()*.4,r=radius*(.7+Math.random()*.5);return {x:Math.cos(a)*r,y:Math.sin(a)*r,s:4+Math.random()*4,c:burstColors[i%burstColors.length],d:Math.random()*.08};})).current;
+ if(still)return null;
+ return <span className="burst" aria-hidden="true">{dots.map((p,i)=><motion.i key={i} style={{width:p.s,height:p.s,background:p.c}} initial={{x:0,y:0,scale:0,opacity:1}} animate={{x:p.x,y:p.y,scale:[0,1.2,.6],opacity:[1,1,0]}} transition={{duration:.85,delay:p.d,ease:[.15,.8,.3,1]}}/>)}</span>;
+}
+
+// Placeholders shaped like what is coming, so the page does not jump when it arrives.
+export function Skel({w='100%',h=14,r=7,className=''}:{w?:number|string;h?:number;r?:number;className?:string}){
+ return <span className={`skel ${className}`} style={{width:w,height:h,borderRadius:r}} aria-hidden="true"/>;
 }

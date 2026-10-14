@@ -1,7 +1,7 @@
 import {useEffect,useState} from 'react';
 import {AnimatePresence,motion} from 'motion/react';
 import {CalendarClock,ClipboardCopy,Code2,Download,ExternalLink,FileText,Globe,LoaderCircle,Send,TriangleAlert,X} from 'lucide-react';
-import {ease} from './ui';
+import {Burst,ease} from './ui';
 import {Tick} from './steps';
 import {copyFormatted,copyHTML,copyMarkdown,downloadZip} from '../article-data';
 import {loadArticle,useWorkspace,whenExact} from '../workspace';
@@ -65,7 +65,7 @@ export function PublishPanel({article,post,images,ready,onToast,onSettings}:{art
    </div>
   </section>
   <AnimatePresence>{run&&<motion.div className="pub-run" initial={{opacity:0,y:8}} animate={{opacity:1,y:0}} exit={{opacity:0}} transition={{duration:.25,ease}}>
-   <header><strong>{run.done?(run.done.status==='published'?`Published on ${platformNames[run.platform]}`:run.done.status==='scheduled'?`Scheduled on ${platformNames[run.platform]} for ${whenExact(new Date(at).toISOString())}`:`Draft is in ${platformNames[run.platform]}`):run.error?'Could not publish':`Sending to ${platformNames[run.platform]}`}</strong>{(run.done||run.error)&&<button className="icon-button" aria-label="Close" onClick={()=>setRun(null)}><X size={16}/></button>}</header>
+   <header>{run.done&&<span className="burst-anchor"><Burst count={16} radius={54}/></span>}<strong>{run.done?(run.done.status==='published'?`Published on ${platformNames[run.platform]}`:run.done.status==='scheduled'?`Scheduled on ${platformNames[run.platform]} for ${whenExact(new Date(at).toISOString())}`:`Draft is in ${platformNames[run.platform]}`):run.error?'Could not publish':`Sending to ${platformNames[run.platform]}`}</strong>{(run.done||run.error)&&<button className="icon-button" aria-label="Close" onClick={()=>setRun(null)}><X size={16}/></button>}</header>
    <ul>{run.steps.map((s,i)=>{const last=i===run.steps.length-1&&!run.done&&!run.error;return <li key={s+i} className={last?'now':'done'}><span>{last?<LoaderCircle className="spin" size={13}/>:<Tick size={12}/>}</span>{s}</li>;})}</ul>
    {run.error&&<p className="pub-error"><TriangleAlert size={15}/>{run.error}</p>}
    {run.done&&<>{run.done.warnings.map(w=><p key={w} className="pub-warn"><TriangleAlert size={15}/>{w}</p>)}

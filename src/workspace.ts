@@ -88,7 +88,8 @@ export async function duplicateArticle(id:string){
 function bulk(ids:string[],action:'archive'|'restore'|'delete'){
  const domain=current.domain,now=new Date().toISOString();
  set({articles:action==='delete'?current.articles.filter(a=>!ids.includes(a.id)):current.articles.map(a=>ids.includes(a.id)?{...a,archivedAt:action==='archive'?a.archivedAt||now:undefined,updated:now}:a)});
- return queue(ids,()=>api('/api/articles/bulk',{domain,ids,action})).then(r=>r!==null);
+ // If it fails, reload from the database so the list matches what is really saved.
+ return queue(ids,()=>api('/api/articles/bulk',{domain,ids,action})).then(r=>{if(r===null)load(domain);return r!==null;});
 }
 export const archiveArticles=(ids:string[])=>bulk(ids,'archive');
 export const restoreArticles=(ids:string[])=>bulk(ids,'restore');
