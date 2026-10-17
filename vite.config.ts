@@ -4,6 +4,7 @@ import {makeWriter,type Writer} from './server/llm';
 import {publishRoutes} from './server/api';
 import {database,type GetStore} from './server/db';
 import {dbRoutes} from './server/db/routes';
+import {marketRoutes} from './server/market-api';
 
 // /api/research?domain=… streams progress as server-sent events while the website is read and the brief is written.
 // API keys stay on this local server; the browser never sees them.
@@ -12,6 +13,7 @@ function researchApi(writer:Writer|null,getStore:GetStore):Plugin{
   const use=server.middlewares.use.bind(server.middlewares);
   publishRoutes(use,getStore);
   dbRoutes(use,getStore);
+  const market=marketRoutes(use,getStore,writer);
   // Internal: both versions of the brief (context.md for the user, context-full.md for writing).
   server.middlewares.use('/api/brief',async(req,res)=>{
    const host=new URL(req.url||'',`http://${req.headers.host}`).searchParams.get('domain')||'';
@@ -23,7 +25,8 @@ function researchApi(writer:Writer|null,getStore:GetStore):Plugin{
    let closed=false;req.on('close',()=>{closed=true;});
    const send=(e:Record<string,unknown>)=>{if(closed)throw new Error('closed');res.write(`data: ${JSON.stringify(e)}\n\n`);};
    if(!writer){send({t:'error',message:'No writing model is set up. Add ANTHROPIC_API_KEY to .env (or LLM_BASE_URL, LLM_API_KEY and LLM_MODEL for testing), then restart the dev server.'});return res.end();}
-   try{await research(domain,writer,send);}catch(err){if(!closed)send({t:'error',message:(err as Error).message});}
+   // When the brief is done, competitors are looked for in the background while the user reads it.
+   try{market.afterResearch(await research(domain,writer,send));}catch(err){if(!closed)send({t:'error',message:(err as Error).message});}
    res.end();
   });
  }};

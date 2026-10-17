@@ -8,15 +8,15 @@ import dns from 'node:dns/promises';
 import net from 'node:net';
 import type {Writer} from './llm';
 
-type Send=(event:Record<string,unknown>)=>void;
+export type Send=(event:Record<string,unknown>)=>void;
 export type Page={url:string;group:string;type:string;title:string;h1:string;meta:string;canonical:string;headings:string[];points:string[];text:string;jsonld:string[];ctas:string[];score:number;fetched:string};
 
 const UA='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36 ComarketerResearch/0.1';
-const ROOT=path.resolve('research-store');
-const sleep=(ms:number)=>new Promise(r=>setTimeout(r,ms));
+export const ROOT=path.resolve('research-store');
+export const sleep=(ms:number)=>new Promise(r=>setTimeout(r,ms));
 
 // Only public websites: block localhost and private ranges.
-async function assertPublic(host:string){
+export async function assertPublic(host:string){
  if(!/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(host))throw new Error('That does not look like a website address.');
  // Lookups can fail for a moment on a flaky connection or VPN, so retry before giving up.
  let address='';
@@ -26,7 +26,7 @@ async function assertPublic(host:string){
  const priv=net.isIPv4(address)?/^(10\.|127\.|0\.|169\.254\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(address):/^(::1|fc|fd|fe80)/i.test(address);
  if(priv)throw new Error('That address is not a public website.');
 }
-async function get(url:string,ms=15000):Promise<{ok:boolean;status:number;text:string;url:string}>{
+export async function get(url:string,ms=15000):Promise<{ok:boolean;status:number;text:string;url:string}>{
  const c=new AbortController(),t=setTimeout(()=>c.abort(),ms);
  try{const r=await fetch(url,{headers:{'user-agent':UA,accept:'text/html,application/xml;q=0.9,*/*;q=0.8'},redirect:'follow',signal:c.signal});
   const text=r.ok?(await r.text()).slice(0,3_000_000):'';return {ok:r.ok,status:r.status,text,url:r.url};}
@@ -49,7 +49,7 @@ async function findUrls(origin:string,send:Send){
  return {urls:[...urls],sitemap,disallow};
 }
 
-const groupOf=(p:string)=>
+export const groupOf=(p:string)=>
  /\/(blog|articles?|posts?|news|insights|learn)(\/|$)/.test(p)?'Blog':
  /(privacy|terms|legal|cookie|gdpr|dpa|imprint|sitemap|login|signin|signup|register|cart|checkout|tag\/|author\/|page\/\d|jobs|careers|become-partner|press|events?\/|webinars?)/.test(p)?'Skip':
  /\/(team|people|authors?|speakers?)\/[^/]+/.test(p)?'Skip':
@@ -65,7 +65,7 @@ const groupOf=(p:string)=>
  p.split('/').filter(Boolean).length===1?'Other pages':'Skip';
 
 // ---------- Pass 2: read a page ----------
-function readPage(html:string,url:string,group:string):Page{
+export function readPage(html:string,url:string,group:string):Page{
  // group can be corrected below (integration pages found outside an /integrations path).
  const $=cheerio.load(html);
  const jsonld=$('script[type="application/ld+json"]').map((_,e)=>$(e).text()).get().flatMap(t=>[...t.matchAll(/"@type"\s*:\s*"([^"]+)"/g)].map(m=>m[1]));
@@ -94,19 +94,19 @@ function scoreProduct(p:Page,navLinks:Set<string>){
  return s;
 }
 
-function companyName(home:Page|undefined,host:string,html:string){
+export function companyName(home:Page|undefined,host:string,html:string){
  const og=cheerio.load(html)('meta[property="og:site_name"]').attr('content');
  if(og)return og.trim();
  const parts=(home?.title||'').split(/\s[|–—-]\s|:\s/).map(s=>s.trim()).filter(Boolean);
  const short=parts.filter(s=>s.split(' ').length<=3).sort((a,b)=>a.length-b.length)[0];
  return short||host.replace(/^www\./,'').split('.')[0].replace(/^\w/,c=>c.toUpperCase());
 }
-function logoOf(html:string,origin:string){
+export function logoOf(html:string,origin:string){
  const $=cheerio.load(html);const href=$('link[rel="apple-touch-icon"]').attr('href')||$('link[rel~="icon"]').attr('href')||'/favicon.ico';
  try{return new URL(href,origin).href;}catch{return origin+'/favicon.ico';}
 }
 
-function note(p:Page,budget:number){
+export function note(p:Page,budget:number){
  const u=new URL(p.url);
  let s=`### ${p.group}: ${u.pathname}${p.canonical&&p.canonical!==p.url?` (canonical ${new URL(p.canonical,u.origin).pathname})`:''}\nTitle: ${p.title}\nH1: ${p.h1}\nMeta: ${p.meta}\nHeadings: ${p.headings.slice(0,14).join(' | ')}\nPoints: ${p.points.slice(0,18).map(x=>x.slice(0,140)).join('; ')}\n`;
  // Text is often glued together without spaces, so take a window around each price mention instead of whole sentences.
@@ -137,7 +137,7 @@ const RULES=`Rules:
 - If something important is missing or two pages disagree, add a line starting with "> **Please confirm:**" inside that section, asking a plain question.
 - Output only the requested markdown sections, each starting with "## ". No preamble, no closing remarks.`;
 
-export async function research(domain:string,writer:Writer,send:Send){
+export async function research(domain:string,writer:Writer,send:Send):Promise<string>{
  const host=domain.trim().toLowerCase().replace(/^https?:\/\//,'').replace(/\/.*$/,'');
  await assertPublic(host);
  // Prefer the address the site redirects to (www or not).
@@ -234,11 +234,14 @@ export async function research(domain:string,writer:Writer,send:Send){
   await fs.writeFile(path.join(dir,'context-full.md'),out);
   await status({full:rx.status==='fulfilled'&&ry.status==='fulfilled'?'ready':'partial'});
  })().catch(e=>status({full:'failed',error:(e as Error).message}));
+ return host;
 }
 
-// Both versions of the brief for a researched company. Article steps use the full one.
+// Both versions of the brief for a researched company. Article steps use the full one, which includes the market
+// (competitors and buyer groups the user confirmed) once there is one.
 export async function readBrief(host:string){
  const dir=path.join(ROOT,host.replace(/[^a-z0-9.-]/gi,''));
  const read=(f:string)=>fs.readFile(path.join(dir,f),'utf8').catch(()=>null);
- return {md:await read('context.md'),full:await read('context-full.md'),status:JSON.parse((await read('status.json'))||'{}')};
+ const full=await read('context-full.md'),market=await read('market.md');
+ return {md:await read('context.md'),full:full&&market?`${full.trimEnd()}\n\n${market}`:full,market,status:JSON.parse((await read('status.json'))||'{}')};
 }

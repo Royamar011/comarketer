@@ -6,13 +6,14 @@ import {Ring,Ticker,WorkList,ease} from '../components/ui';
 import {firstLine,parse} from '../content/context';
 import {setCompany} from '../workspace';
 import {BriefView} from '../components/brief';
+import {MarketSetup} from '../components/market';
 
 export type ObStart='welcome'|'website'|'research';
 export function Onboarding({onFinish,onExit,start='welcome',initialDomain=''}:{onFinish:()=>void;onExit?:()=>void;start?:ObStart;initialDomain?:string}){
- const [stage,setStage]=useState<ObStart|'review'>(start),[domain,setDomain]=useState(initialDomain);
- const step=['website','research','review'].indexOf(stage);
+ const [stage,setStage]=useState<ObStart|'review'|'market'>(start),[domain,setDomain]=useState(initialDomain);
+ const step=['website','research','review','market'].indexOf(stage);
  return <div className="onboarding">
-  {stage!=='welcome'&&<header className="ob-top"><Logo/><ol className="ob-steps" aria-label="Setup">{['Website','Your company','Your brief'].map((s,i)=><li key={s} className={i<step?'done':i===step?'now':''}><span>{i<step?<Check size={11} strokeWidth={3}/>:i+1}</span>{s}</li>)}</ol>{start!=='welcome'&&onExit?<button className="button ghost compact" onClick={onExit}>Back to workspace</button>:<span className="preview-chip">Design preview</span>}</header>}
+  {stage!=='welcome'&&<header className="ob-top"><Logo/><ol className="ob-steps" aria-label="Setup">{['Website','Your company','Your brief','Your market'].map((s,i)=><li key={s} className={i<step?'done':i===step?'now':''}><span>{i<step?<Check size={11} strokeWidth={3}/>:i+1}</span>{s}</li>)}</ol>{start!=='welcome'&&onExit?<button className="button ghost compact" onClick={onExit}>Back to workspace</button>:<span className="preview-chip">Design preview</span>}</header>}
   <AnimatePresence mode="wait">
    <motion.main key={stage} className={`ob-stage ob-${stage}`} initial={{opacity:0,y:14}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-10,transition:{duration:.2}}} transition={{duration:.45,ease}}>
 
@@ -27,7 +28,7 @@ export function Onboarding({onFinish,onExit,start='welcome',initialDomain=''}:{o
     </div>}
 
     {stage==='website'&&<div className="ob-center">
-     <span className="eyebrow">Step 1 of 3</span>
+     <span className="eyebrow">Step 1 of 4</span>
      <h1>Start with your website</h1>
      <p className="lead">It is all we need. Every article will know your products, your customers and what makes you different.</p>
      <form className="domain-bar" onSubmit={e=>{e.preventDefault();if(domain.trim())setStage('research');}}>
@@ -40,7 +41,9 @@ export function Onboarding({onFinish,onExit,start='welcome',initialDomain=''}:{o
 
     {stage==='research'&&<Learning domain={domain} onDone={()=>setStage('review')} onBack={()=>setStage('website')}/>}
 
-    {stage==='review'&&<Brief onConfirm={onFinish}/>}
+    {stage==='review'&&<Brief onConfirm={()=>setStage('market')}/>}
+
+    {stage==='market'&&<MarketSetup onDone={onFinish}/>}
 
    </motion.main>
   </AnimatePresence>
@@ -77,12 +80,12 @@ function Learning({domain,onDone,onBack}:{domain:string;onDone:()=>void;onBack:(
  const groupAt=phase==='read'?Math.max(0,groups.findIndex(g=>g.group===now?.group)):phase==='write'?groups.length:labels.length;
  const progress=phase==='done'?1:phase==='write'?.7+Math.min(.28,(parts.a.length+parts.b.length)/14000*.28):Math.min(.68,.08+pages/Math.max(reading,1)*.6);
  if(phase==='error')return <div className="ob-center learn-error">
-  <span className="eyebrow">Step 2 of 3</span><h1>We could not read {host}</h1><p className="lead">{err}</p>
+  <span className="eyebrow">Step 2 of 4</span><h1>We could not read {host}</h1><p className="lead">{err}</p>
   <div className="err-actions"><button className="button primary" onClick={()=>setRun(r=>r+1)}>Try again</button><button className="button ghost" onClick={onBack}>Use a different website</button></div>
  </div>;
  return <div className="learning">
   <section className="learn-left">
-   <span className="eyebrow">Step 2 of 3</span>
+   <span className="eyebrow">Step 2 of 4</span>
    <h1>Your brief for <span className="host">{host}</span></h1>
    <div className="learn-meter"><Ring value={progress}/><div><strong>{phase==='read'?<><Ticker value={pages}/> pages read and saved</>:phase==='write'?'Writing your brief':'Your brief is ready'}</strong><span className="mono reading">{phase==='read'&&now?`Reading ${new URL(now.url).host}${new URL(now.url).pathname}`:line}</span></div></div>
    {groups.length?<WorkList steps={labels} at={groupAt}/>:<div className="doc-placeholder"><span/><span/><span/></div>}
@@ -105,7 +108,7 @@ function Learning({domain,onDone,onBack}:{domain:string;onDone:()=>void;onBack:(
 
 function Brief({onConfirm}:{onConfirm:()=>void}){
  return <div className="brief">
-  <div className="brief-head"><div><span className="eyebrow">Step 3 of 3</span><h1>Your company brief is ready</h1><p className="lead">Read it once and fix anything that is wrong. Every article is written from it.</p></div><button className="button primary xl" onClick={onConfirm}>Looks right, open my workspace <ArrowRight size={18}/></button></div>
+  <div className="brief-head"><div><span className="eyebrow">Step 3 of 4</span><h1>Your company brief is ready</h1><p className="lead">Read it once and fix anything that is wrong. Every article is written from it.</p></div><button className="button primary xl" onClick={onConfirm}>Looks right, next: competitors <ArrowRight size={18}/></button></div>
   <BriefView animate/>
  </div>;
 }

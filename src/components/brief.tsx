@@ -45,7 +45,7 @@ export function BriefView({animate=false}:{animate?:boolean}){
   </nav>
   <div className="brief-col">
   <article className="brief-doc md-doc">
-   <div className="doc-title"><img src={ws.logo} alt="" width={30} height={30} onError={e=>(e.currentTarget.style.visibility='hidden')}/><h1>{ws.name}</h1><span className="mono">context.md</span></div>
+   <div className="doc-title">{ws.logo&&<img src={ws.logo} alt="" width={30} height={30} onError={e=>(e.currentTarget.style.visibility='hidden')}/>}<h1>{ws.name}</h1><span className="mono">context.md</span></div>
    {sections.map((s,i)=><motion.section key={s.id} id={`sec-${s.id}`} className={changed.includes(s.id)?'changed':''} initial={animate?{opacity:0,y:10}:false} animate={{opacity:1,y:0}} transition={{delay:i*.04,duration:.4,ease}} onMouseEnter={()=>setActive(s.id)}>
     <header><h2>{s.title}{changed.includes(s.id)&&<motion.span className="upd-tag" initial={{opacity:0,scale:.9}} animate={{opacity:1,scale:1}}>Updated from your note</motion.span>}</h2>
      <AnimatePresence mode="wait">{justSaved===s.id?<motion.span key="saved" className="saved-flash" initial={{opacity:0,y:4}} animate={{opacity:1,y:0}} exit={{opacity:0}}><Check size={14}/>Saved. New articles use this.</motion.span>

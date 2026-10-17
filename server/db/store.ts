@@ -124,6 +124,18 @@ export function makeStore(db:Db){
     return done;
    });
   },
+  // Competitors and buyer groups (server/market.ts). Saving one list leaves the other as it is.
+  async getMarket(domain:unknown){
+   const c=await companyRow(db.query,domain);return {competitors:c?.competitors||[],groups:c?.buyer_groups||[]};
+  },
+  async saveMarket(domain:unknown,m:{competitors?:unknown[];groups?:unknown[]}){
+   const sets:[string,unknown][]=[];
+   if(m.competitors){if(!Array.isArray(m.competitors)||m.competitors.length>60)throw bad('Too many competitors.');sets.push(['competitors',JSON.stringify(m.competitors)]);}
+   if(m.groups){if(!Array.isArray(m.groups)||m.groups.length>30)throw bad('Too many buyer groups.');sets.push(['buyer_groups',JSON.stringify(m.groups)]);}
+   const c=await ensureCompany(db.query,domain);
+   const r=sets.length?(await db.query(`update companies set ${sets.map((x,i)=>`${x[0]}=$${i+2}`).join(',')},updated_at=now() where id=$1 returning competitors,buyer_groups`,[c.id,...sets.map(x=>x[1])]))[0]:c;
+   return {competitors:r.competitors||[],groups:r.buyer_groups||[]};
+  },
   // One-time move of a company and its articles from an older browser-only version. Articles already here are kept as they are.
   async importBrowser(company:Partial<Company>&{domain:string},articles:unknown){
    const c=await store.saveCompany(company);

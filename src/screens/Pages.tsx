@@ -5,6 +5,7 @@ import {ArrowRight,Check,CheckCircle2,ExternalLink,FileText,ImageIcon,Layers,Loa
 import {Tile,ease,type Notice} from '../components/ui';
 import {StepTrack} from '../components/steps';
 import {BriefView} from '../components/brief';
+import {MarketView} from '../components/market';
 import {Connections} from '../components/connections';
 import {useWorkspace,when,whenExact} from '../workspace';
 import {voicesFor,workflowSteps,type Article,type Voice} from '../data';
@@ -62,13 +63,13 @@ function BlogCard({a,i,onOpen,onContinue}:{a:Article;i:number;onOpen:(id:string)
 }
 
 export function Context({onRefresh,onChange}:{onRefresh:()=>void;onChange:()=>void}){
- const [raw,setRaw]=useState(false),ws=useWorkspace();
+ const [tab,setTab]=useState<'brief'|'market'|'raw'>(()=>location.hash.endsWith('/market')?'market':'brief'),ws=useWorkspace();
  return <div>
-  {ws.md&&<div className="context-top"><div className="company-line"><img src={ws.logo} alt="" width={44} height={44}/><div><strong>{ws.name}</strong><span className="mono">{ws.domain} · researched from the website</span></div></div>
-   <div className="seg" role="tablist"><button role="tab" aria-selected={!raw} className={!raw?'on':''} onClick={()=>setRaw(false)}>Brief</button><button role="tab" aria-selected={raw} className={raw?'on':''} onClick={()=>setRaw(true)}>context.md</button></div>
+  {ws.md&&<div className="context-top"><div className="company-line">{ws.logo&&<img src={ws.logo} alt="" width={44} height={44}/>}<div><strong>{ws.name}</strong><span className="mono">{ws.domain} · researched from the website</span></div></div>
+   <div className="seg" role="tablist">{([['brief','Brief'],['market','Your market'],['raw','context.md']] as const).map(([id,label])=><button key={id} role="tab" aria-selected={tab===id} className={tab===id?'on':''} onClick={()=>setTab(id)}>{label}</button>)}</div>
    <div className="context-actions"><button className="button ghost" onClick={onChange}>Use a different website</button><button className="button secondary" onClick={onRefresh}><RefreshCw size={16}/>Research my website again</button></div></div>}
   {!ws.md?<div className="empty-brief"><Globe size={22}/><strong>No company brief yet</strong><p>Add your website and we read it to build the brief every article is written from.</p><button className="button primary" onClick={onChange}>Add your website <ArrowRight size={16}/></button></div>
-   :raw?<pre className="md-raw">{ws.md}</pre>:<BriefView key={ws.md.length+ws.domain}/>}
+   :tab==='raw'?<pre className="md-raw">{ws.md}</pre>:tab==='market'?<MarketView/>:<BriefView key={ws.md.length+ws.domain}/>}
  </div>;
 }
 

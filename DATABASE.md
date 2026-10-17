@@ -48,6 +48,7 @@ Your existing articles: anything saved in the browser by an earlier version move
 |---|---|
 | `companies` | One row per website: name, logo, brief (`context.md`), pages saved. `domain` is unique |
 | `articles` | Keyword, title, status (`in_progress`, `ready`, `scheduled`, `published`), step and next action, voice, `plan` (every choice made so far, so an article reopens where it was left), `content` (the finished `Post`, including edits), counts, slug, the blog it went to and its links, scheduled and published dates, `archived_at` |
+| `companies.competitors`, `companies.buyer_groups` | The company's market (migration `002_market.sql`): competitors with how each was found and whether the user kept or removed it, and buyer groups with their evidence quotes. See `server/market.ts` |
 | `article_events` | The article's history: started, each step done, ready, edited, SEO changed, sent as a draft, scheduled, published, archived, restored, duplicated |
 | `schema_migrations` | Which migration files have run |
 
