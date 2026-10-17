@@ -66,7 +66,7 @@ export function Context({onRefresh,onChange}:{onRefresh:()=>void;onChange:()=>vo
  const [tab,setTab]=useState<'brief'|'market'|'raw'>(()=>location.hash.endsWith('/market')?'market':'brief'),ws=useWorkspace();
  return <div>
   {ws.md&&<div className="context-top"><div className="company-line">{ws.logo&&<img src={ws.logo} alt="" width={44} height={44}/>}<div><strong>{ws.name}</strong><span className="mono">{ws.domain} · researched from the website</span></div></div>
-   <div className="seg" role="tablist">{([['brief','Brief'],['market','Your market'],['raw','context.md']] as const).map(([id,label])=><button key={id} role="tab" aria-selected={tab===id} className={tab===id?'on':''} onClick={()=>setTab(id)}>{label}</button>)}</div>
+   <div className="seg" role="tablist">{([['brief','Brief'],['market','Competitors and ICPs'],['raw','context.md']] as const).map(([id,label])=><button key={id} role="tab" aria-selected={tab===id} className={tab===id?'on':''} onClick={()=>setTab(id)}>{label}</button>)}</div>
    <div className="context-actions"><button className="button ghost" onClick={onChange}>Use a different website</button><button className="button secondary" onClick={onRefresh}><RefreshCw size={16}/>Research my website again</button></div></div>}
   {!ws.md?<div className="empty-brief"><Globe size={22}/><strong>No company brief yet</strong><p>Add your website and we read it to build the brief every article is written from.</p><button className="button primary" onClick={onChange}>Add your website <ArrowRight size={16}/></button></div>
    :tab==='raw'?<pre className="md-raw">{ws.md}</pre>:tab==='market'?<MarketView/>:<BriefView key={ws.md.length+ws.domain}/>}

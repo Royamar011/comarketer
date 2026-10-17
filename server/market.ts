@@ -190,8 +190,8 @@ export async function findBuyerGroups(host:string,deps:{writer:Writer;store:Mark
  const mine=site.pages.filter(p=>['Home page','Industries and use cases','Customers','Pricing','Product and feature pages','Company and FAQ'].includes(p.group)).sort((a,b)=>b.score-a.score);
  const sources=new Map<string,Page[]>([['you',mine]]);
  let n=0;
- await pool(rivals,3,async c=>{const pages=await competitorPages(c.domain).catch(()=>[]);if(pages.length)sources.set(c.domain,pages);progress(`Reading competitors’ websites`,++n,rivals.length);});
- progress('Working out who buys');
+ await pool(rivals,3,async c=>{const pages=await competitorPages(c.domain).catch(()=>[]);if(pages.length)sources.set(c.domain,pages);progress('Reading competitors’ websites',++n,rivals.length);});
+ progress('Building ICPs');
  const budget=writer.inputChars,each=Math.round(budget*.6/Math.max(1,sources.size-1));
  const notes=[`=== YOU: ${site.name} (${own}) ===\n${notesOf(mine,Math.round(budget*.4))}`,...[...sources.entries()].filter(([k])=>k!=='you').map(([d,p])=>`=== ${d} (${rivals.find(r=>r.domain===d)?.name||d}) ===\n${notesOf(p,each)}`)].join('\n');
  const out=json<{groups:Omit<BuyerGroup,'id'|'served'|'companies'|'confidence'|'added'|'status'>[]}>((await writer.write({maxTokens:Math.min(9000,writer.maxOutput),
@@ -226,14 +226,14 @@ export function marketMd(name:string,m:Market){
  const comp=m.competitors.filter(c=>c.status==='kept'),groups=m.groups.filter(g=>g.status==='kept');
  const line=(label:string,v:string[])=>v.length?`- ${label}: ${v.join('; ')}\n`:'';
  return `## Competitors (confirmed by the user)
-${comp.map(c=>`- ${c.name||c.domain} (${c.domain})${c.match==='adjacent'?' [sometimes compared]':''}${c.what?`: ${c.what}`:''}${c.why?` ${c.why}`:''}`).join('\n')||'- None confirmed yet.'}
+${comp.map(c=>`- ${c.name||c.domain} (${c.domain})${c.match==='adjacent'?' [adjacent]':''}${c.what?`: ${c.what}`:''}${c.why?` ${c.why}`:''}`).join('\n')||'- None confirmed yet.'}
 
-## Buyer groups
-> Rule: only groups marked "${name} serves this" may be described as who ${name} is for. The others describe the wider market: use them to understand shared problems, words and comparisons, never to claim ${name} targets them.
+## Ideal customer profiles
+> Rule: only profiles marked "Your ICP" may be described as who ${name} is for. "Adjacent segment" profiles describe the wider market: use them for shared pain points, words and comparisons, never to claim ${name} targets them.
 
-${groups.map(g=>`### ${g.name} [${g.served==='yours'?`${name} serves this`:'Others in the market serve this'}]
+${groups.map(g=>`### ${g.name} [${g.served==='yours'?'Your ICP':'Adjacent segment'}]
 ${g.who}
-${line('Company type',[g.companyType,g.size].filter(Boolean))}${line('Roles',g.roles)}${line('Problems',g.pains)}${line('What makes them look',g.triggers)}${line('What they search for',g.searches)}${line('What they compare',g.compares)}${line('Why they hesitate',g.objections)}- How much they know: ${g.knowledge}
+${line('Company type',[g.companyType,g.size].filter(Boolean))}${line('Decision makers',g.roles)}${line('Pain points',g.pains)}${line('Buying triggers',g.triggers)}${line('Search terms',g.searches)}${line('Alternatives considered',g.compares)}${line('Objections',g.objections)}- Awareness: ${{new:'problem aware',familiar:'solution aware',expert:'product aware'}[g.knowledge]}
 ${g.evidence.map(e=>`- Evidence [${e.from==='you'?name:e.from} ${e.page}]: "${e.quote}"`).join('\n')}`).join('\n\n')||'None confirmed yet.'}
 `;
 }
