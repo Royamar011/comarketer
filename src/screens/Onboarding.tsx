@@ -43,7 +43,7 @@ export function Onboarding({onFinish,onExit,start='welcome',initialDomain=''}:{o
 
     {stage==='welcome'&&<div className="welcome">
      <BrandIntro/>
-     <motion.div className="welcome-copy" initial={{opacity:0,y:16}} animate={{opacity:1,y:0}} transition={{delay:2.5,duration:.6,ease}}>
+     <motion.div className="welcome-copy" initial={{opacity:0,y:16}} animate={{opacity:1,y:0}} transition={{delay:3.2,duration:.6,ease}}>
       <h1>Articles that rank, get cited, and sound like&nbsp;you.</h1>
       <p>Original, publish-ready articles that win search and AI answers, without briefing a writer.</p>
       <button className="button primary xl" onClick={()=>setStage('website')}>Set up my workspace <ArrowRight size={18}/></button>

@@ -72,8 +72,10 @@ button.kw:hover{border-color:var(--blue);background:#E3EBFF}button.kw.muted:hove
 
 /* Brand */
 .logo{display:block;flex-shrink:0}
-.intro{display:flex;align-items:center;justify-content:center;gap:18px}
+.intro{display:grid;place-items:center}.intro>*{grid-area:1/1}
 .intro-logo{display:block;width:min(560px,82vw);height:auto;overflow:visible}
+.intro-word{display:inline-flex;align-items:baseline;font:800 min(76px,9.6vw)/1.05 var(--display);letter-spacing:-.05em;color:var(--ink);white-space:nowrap;transform-origin:0 0}.intro-base{display:inline-block;width:0;height:0;vertical-align:baseline}
+.intro-fall{display:inline-block;overflow:hidden;color:var(--muted)}.intro-gap{display:inline-block}
 
 /* Onboarding */
 .onboarding{min-height:100vh;display:flex;flex-direction:column;background:radial-gradient(1200px 600px at 50% -10%,#F3F1E6 0%,transparent 60%),var(--paper)}
