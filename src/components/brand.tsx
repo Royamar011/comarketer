@@ -1,30 +1,27 @@
 import {motion,useReducedMotion} from 'motion/react';
-import {LOGO_RATIO,LOGO_VIEWBOX,bar,dot,letters,ring} from './logo-paths';
 const ease=[.22,.7,.2,1] as const;
 
-// The logo: wordmark in ink, the dot and the mark (a ring standing on a line) in cobalt.
-// tone="white" for dark backgrounds. Files for use outside the app are in public/brand/.
-export function Logo({size=26,tone='color'}:{size?:number;tone?:'color'|'ink'|'white'}){
- const h=Math.round(size*.82),word=tone==='white'?'#fff':'var(--ink)',accent=tone==='color'?'var(--blue)':word;
- return <svg className="logo" role="img" aria-label="comarketer" viewBox={LOGO_VIEWBOX} height={h} width={Math.round(h*LOGO_RATIO)}>
-  <path fill={word} fillRule="evenodd" d={letters.join(' ')}/><path fill={accent} fillRule="evenodd" d={`${dot} ${ring} ${bar}`}/>
- </svg>;
+// Wordmark only. The logo mark is not confirmed yet, so no symbol is shown anywhere.
+export function Logo({size=26}:{size?:number}){
+ return <span className="logo" style={{fontSize:Math.round(size*.8)}}>comarketer<b>.</b></span>;
 }
 
 /*
- First impression only, played once. The mark builds first: the line draws, the ring drops onto it.
- Then the word rises in letter by letter, and the dot lands last. Nothing loops.
+ First impression only. "content" and "marketer" sit apart. The letters of "ntent" fall away one by one,
+ "marketer" glides in to meet "co", then the period lands. Nothing changes case, nothing repeats.
 */
+const fall=['n','t','e','n','t'];
 export function BrandIntro(){
  const still=useReducedMotion();
- if(still)return <div className="intro"><Logo size={80}/></div>;
- const word=.55;
- return <div className="intro">
-  <svg className="intro-logo" role="img" aria-label="comarketer" viewBox={LOGO_VIEWBOX}>
-   <motion.path fill="var(--blue)" fillRule="evenodd" d={bar} style={{transformBox:'fill-box',transformOrigin:'left center'}} initial={{scaleX:0}} animate={{scaleX:1}} transition={{duration:.5,ease}}/>
-   <motion.path fill="var(--blue)" fillRule="evenodd" d={ring} style={{transformBox:'fill-box',transformOrigin:'center bottom'}} initial={{y:-260,opacity:0,scaleY:1}} animate={{y:0,opacity:1,scaleY:[1,1,.86,1]}} transition={{y:{delay:.3,type:'spring',stiffness:420,damping:15},opacity:{delay:.3,duration:.15},scaleY:{delay:.3,duration:.6,times:[0,.45,.6,1]}}}/>
-   {letters.map((d,i)=><motion.path key={i} fill="var(--ink)" fillRule="evenodd" d={d} initial={{y:90,opacity:0}} animate={{y:0,opacity:1}} transition={{delay:word+i*.055,duration:.55,ease}}/>)}
-   <motion.path fill="var(--blue)" fillRule="evenodd" d={dot} style={{transformBox:'fill-box',transformOrigin:'center'}} initial={{y:-200,opacity:0}} animate={{y:0,opacity:1}} transition={{delay:word+letters.length*.055+.15,type:'spring',stiffness:520,damping:14}}/>
-  </svg>
+ if(still)return <div className="intro" aria-label="comarketer"><span className="intro-word">comarketer<b>.</b></span></div>;
+ const start=.9;
+ return <div className="intro" aria-label="comarketer">
+  <span className="intro-word" aria-hidden="true">
+   <motion.span initial={{opacity:0,y:14}} animate={{opacity:1,y:0}} transition={{duration:.6,ease}}>co</motion.span>
+   {fall.map((l,i)=><motion.span key={i} className="intro-fall" initial={{opacity:0,y:14,maxWidth:'1em'}} animate={{opacity:[0,1,1,0],y:[14,0,0,22],maxWidth:['1em','1em','1em','0em'],rotate:[0,0,0,i%2?8:-8]}} transition={{duration:start+.55+i*.06,times:[0,.35,.62+i*.03,1],ease}}>{l}</motion.span>)}
+   <motion.span className="intro-gap" initial={{width:'.32em'}} animate={{width:'0em'}} transition={{delay:start+.25,duration:.5,ease}}/>
+   <motion.span initial={{opacity:0,y:14}} animate={{opacity:1,y:0}} transition={{duration:.6,delay:.12,ease}}>marketer</motion.span>
+   <motion.b initial={{opacity:0,y:-18}} animate={{opacity:1,y:0}} transition={{delay:start+1.1,type:'spring',stiffness:500,damping:16}}>.</motion.b>
+  </span>
  </div>;
 }
